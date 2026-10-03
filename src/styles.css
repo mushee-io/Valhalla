@@ -713,3 +713,178 @@ button:disabled {
   .identity-line { grid-template-columns: auto 1fr; }
   .economy-summary { flex-wrap: wrap; justify-content: flex-end; }
 }
+
+
+/* Milestones 6–10 */
+.civ-panel { margin-top: 14px; }
+.civ-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.civ-metrics {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.civ-metrics > div {
+  min-width: 0;
+  padding: 13px 12px;
+  background: var(--panel-2);
+}
+.civ-metrics span {
+  display: block;
+  color: var(--muted);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.civ-metrics b {
+  display: block;
+  margin-top: 6px;
+  font: 700 16px "Space Grotesk";
+}
+.civ-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.civ-block {
+  min-width: 0;
+  padding: 18px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(circle at 100% 0, rgba(97,169,255,.045), transparent 38%),
+    transparent;
+}
+.civ-block:nth-child(4) { border-right: 0; }
+.civ-block.civ-wide {
+  grid-column: 1 / -1;
+  border-right: 0;
+  border-bottom: 0;
+}
+.civ-kicker {
+  display: block;
+  color: var(--accent);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+.civ-block h3 {
+  margin-top: 7px;
+  margin-bottom: 13px;
+  font-size: 14px;
+}
+.civ-copy {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.civ-note {
+  margin-top: 11px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+.mini-cards,
+.power-board {
+  display: grid;
+  gap: 7px;
+}
+.mini-cards > div,
+.power-board > div,
+.chain-receipt,
+.treasure-strip > div {
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 10px;
+  background: rgba(255,255,255,.022);
+}
+.mini-cards span,
+.power-board span,
+.chain-receipt span,
+.treasure-strip span {
+  display: block;
+  color: var(--muted);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+.mini-cards b,
+.power-board b,
+.chain-receipt b,
+.treasure-strip b {
+  display: block;
+  margin-top: 5px;
+  font-size: 10px;
+}
+.mini-cards small,
+.power-board small,
+.chain-receipt small,
+.treasure-strip small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 8.5px;
+  line-height: 1.35;
+}
+.power-board > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 10px;
+}
+.power-board small { grid-column: 1 / -1; }
+.chain-receipt {
+  margin-top: 13px;
+  border-color: rgba(97,169,255,.18);
+}
+.chain-receipt b {
+  color: #8fc0ff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chain-receipt a {
+  display: inline-block;
+  margin-top: 9px;
+  color: var(--accent);
+  font-size: 9px;
+  text-decoration: none;
+}
+.treasure-strip {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+.treasure-strip > div {
+  min-width: 0;
+  border-style: dashed;
+}
+.treasure-strip > div.claimed {
+  border-style: solid;
+  border-color: rgba(216,255,82,.16);
+  background: rgba(216,255,82,.035);
+}
+.event-property > i { background: #54e6a3; }
+.event-company > i { background: #61a9ff; }
+.event-city > i { background: #f7ce61; }
+.event-nation > i { background: #9d77ff; }
+.event-combat > i { background: var(--red); }
+.event-treasure > i { background: #f7ce61; box-shadow: 0 0 10px rgba(247,206,97,.6); }
+.event-chain > i { background: #14f195; box-shadow: 0 0 10px rgba(20,241,149,.5); }
+
+@media (max-width: 1250px) {
+  .civ-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .civ-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .civ-block:nth-child(2n) { border-right: 0; }
+  .civ-block.civ-wide { grid-column: 1 / -1; }
+  .treasure-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .civ-actions { width: 100%; justify-content: stretch; }
+  .civ-actions button { flex: 1; }
+  .civ-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .civ-grid { grid-template-columns: 1fr; }
+  .civ-block,
+  .civ-block:nth-child(2n) { border-right: 0; }
+  .civ-block.civ-wide { grid-column: auto; }
+  .treasure-strip { grid-template-columns: 1fr 1fr; }
+}
