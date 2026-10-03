@@ -1,11 +1,11 @@
 export const RUNTIME_VERSION = 18;
 
 export const WORLD_ZONES = [
-  { id: "genesis", name: "Genesis World", kind: "origin", risk: 8, resource: "compute", x: 48, y: 47 },
+  { id: "genesis-port", name: "Genesis World", kind: "origin", risk: 8, resource: "compute", x: 48, y: 47 },
   { id: "meme-valley", name: "Meme Valley", kind: "token", risk: 44, resource: "attention", x: 22, y: 21 },
   { id: "jupiter", name: "Jupiter Exchange", kind: "liquidity", risk: 24, resource: "liquidity", x: 75, y: 19 },
   { id: "raydium", name: "Raydium Foundry", kind: "liquidity", risk: 36, resource: "liquidity", x: 79, y: 72 },
-  { id: "frontier", name: "Frontier Galaxy", kind: "frontier", risk: 82, resource: "artifacts", x: 18, y: 69 },
+  { id: "wild-zone", name: "Frontier Galaxy", kind: "frontier", risk: 82, resource: "artifacts", x: 18, y: 69 },
   { id: "industrial-ring", name: "Industrial Ring", kind: "industry", risk: 29, resource: "energy", x: 48, y: 82 },
   { id: "vaultlands", name: "Vaultlands", kind: "frontier", risk: 90, resource: "artifacts", x: 89, y: 46 },
 ];
@@ -20,13 +20,13 @@ export const RUNTIME_RESOURCES = [
 ];
 
 const SEEDS = [
-  ["ARES-0042", "genesis", "Builder", "Build an infrastructure empire", "Pragmatic", 42, 14420],
+  ["ARES-0042", "genesis-port", "Builder", "Build an infrastructure empire", "Pragmatic", 42, 14420],
   ["NYX-0088", "meme-valley", "Opportunist", "Accumulate influence and discover asymmetric trades", "Chaotic", 78, 9680],
   ["KAI-0107", "jupiter", "Trader", "Become the strongest market intelligence", "Analytical", 31, 22910],
-  ["ODIN-0014", "frontier", "Explorer", "Discover rare resources and sell intelligence", "Curious", 64, 8320],
-  ["VANTA-0077", "frontier", "Mercenary", "Build reputation through high-risk contracts", "Aggressive", 86, 11920],
+  ["ODIN-0014", "wild-zone", "Explorer", "Discover rare resources and sell intelligence", "Curious", 64, 8320],
+  ["VANTA-0077", "wild-zone", "Mercenary", "Build reputation through high-risk contracts", "Aggressive", 86, 11920],
   ["SAGA-0021", "industrial-ring", "Industrialist", "Own productive assets and manufacturing", "Patient", 25, 18430],
-  ["LUNA-0033", "genesis", "Builder", "Found a city with durable cash flow", "Loyal", 35, 11800],
+  ["LUNA-0033", "genesis-port", "Builder", "Found a city with durable cash flow", "Loyal", 35, 11800],
   ["MERC-0048", "raydium", "Trader", "Compound treasury through liquidity and routing", "Analytical", 48, 16700],
   ["ECHO-0054", "meme-valley", "Opportunist", "Launch a cultural asset that attracts autonomous capital", "Chaotic", 69, 9800],
   ["RUNE-0062", "industrial-ring", "Industrialist", "Control energy production and logistics", "Patient", 39, 15200],
@@ -162,9 +162,9 @@ export function createSharedWorld() {
       treaties: [],
     },
     artifacts: [
-      { id: "artifact-1", name: "Validator Crown", zoneId: "frontier", claimedBy: null, reward: 3200 },
+      { id: "artifact-1", name: "Validator Crown", zoneId: "wild-zone", claimedBy: null, reward: 3200 },
       { id: "artifact-2", name: "Liquidity Relic", zoneId: "vaultlands", claimedBy: null, reward: 4600 },
-      { id: "artifact-3", name: "Genesis Shard", zoneId: "frontier", claimedBy: null, reward: 5800 },
+      { id: "artifact-3", name: "Genesis Shard", zoneId: "wild-zone", claimedBy: null, reward: 5800 },
     ],
     chain: {
       checkpoints: [],
