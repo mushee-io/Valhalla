@@ -1,0 +1,13 @@
+[features]
+seeds = false
+skip-lint = false
+
+[programs.devnet]
+valhalla_registry = "Fg6PaFpoGXkYsidMpWxTWqkZsrS4H3W6rFLboBiHLmZW"
+
+[provider]
+cluster = "Devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "anchor test"
