@@ -1,37 +1,29 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  WORLD_VERSION,
   advanceWorld,
   createInitialWorld,
   deployAgent,
-  formatWorldTime,
-  fundAgent,
   getRegion,
   migrateWorld,
   releaseAgent,
-  shortWallet,
 } from "./world";
 import {
   advanceCivilization,
-  buildPropertyForAgent,
   ensureCivilizationState,
-  igniteCivilization,
-  registerChainAnchor,
 } from "./civilization";
 import {
-  anchorWorldCheckpoint,
   connectPhantom,
   createGenesisProof,
   getDevnetBalance,
 } from "./solana";
-import WorldMap from "./ui/WorldMap";
-import AgentPanel from "./ui/AgentPanel";
-import Ledger from "./ui/Ledger";
-import EconomyPanel from "./ui/EconomyPanel";
-import CivilizationPanel from "./ui/CivilizationPanel";
+import {
+  createSharedAgent,
+  getSharedWorld,
+  releaseSharedAgent,
+  tickSharedWorld,
+} from "./runtime/shared";
 import DeployModal from "./ui/DeployModal";
 import Landing from "./ui/Landing";
-import UniverseConsole from "./ui/UniverseConsole";
 import PortalUniverse from "./ui/PortalUniverse";
 
 const STORAGE_KEY = "valhalla-world-v10";
@@ -49,14 +41,43 @@ function loadWorld() {
   }
 }
 
+function mergeRemoteWorld(current, remote) {
+  const agents = Array.isArray(remote?.agents) ? remote.agents : [];
+  const currentSelected = current?.selectedAgent;
+  const selectedAgent =
+    agents.some((agent) => agent.id === currentSelected)
+      ? currentSelected
+      : agents[0]?.id || currentSelected;
+
+  const selected = agents.find((agent) => agent.id === selectedAgent);
+  const candidateRegion =
+    current?.selectedRegion &&
+    getRegion(current.selectedRegion)
+      ? current.selectedRegion
+      : selected?.regionId || selected?.zoneId || "genesis-port";
+
+  return ensureCivilizationState({
+    ...remote,
+    selectedAgent,
+    selectedRegion: candidateRegion,
+    wallet: current?.wallet || remote.wallet || null,
+    walletBalance:
+      current?.walletBalance ?? remote.walletBalance ?? null,
+    totalVolume:
+      remote?.totalVolume ??
+      remote?.metrics?.totalVolume ??
+      current?.totalVolume ??
+      0,
+  });
+}
+
 export default function App() {
   const [world, setWorld] = useState(loadWorld);
   const [deployOpen, setDeployOpen] = useState(false);
   const [entered, setEntered] = useState(false);
-  const [economyOpen, setEconomyOpen] = useState(true);
   const [walletError, setWalletError] = useState("");
   const [deploying, setDeploying] = useState(false);
-  const [anchoring, setAnchoring] = useState(false);
+  const [runtimeMode, setRuntimeMode] = useState("probing");
   const [form, setForm] = useState({
     name: "VALKYRIE",
     archetype: "Builder",
@@ -64,6 +85,7 @@ export default function App() {
     personality: "Pragmatic",
     risk: 45,
     wealth: 2500,
+    zoneId: "genesis-port",
   });
 
   useEffect(() => {
@@ -71,20 +93,81 @@ export default function App() {
   }, [world]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    getSharedWorld()
+      .then((result) => {
+        if (cancelled || !result?.world?.agents?.length) return;
+        setRuntimeMode("shared");
+        setWorld((current) => mergeRemoteWorld(current, result.world));
+      })
+      .catch(() => {
+        if (!cancelled) setRuntimeMode("local");
+      });
+
+    const fallback = window.setTimeout(() => {
+      if (!cancelled) {
+        setRuntimeMode((mode) => (mode === "probing" ? "local" : mode));
+      }
+    }, 4500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(fallback);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!world.running) return;
-    const delay = world.civilizationMode ? 2400 : 1800;
-    const timer = window.setInterval(() => {
-      setWorld((current) => advanceCivilization(advanceWorld(ensureCivilizationState(current))));
-    }, delay);
-    return () => window.clearInterval(timer);
-  }, [world.running, world.civilizationMode]);
+
+    if (runtimeMode === "shared") {
+      let busy = false;
+      const run = async () => {
+        if (busy) return;
+        busy = true;
+        try {
+          const result = await tickSharedWorld({
+            allowLLM: true,
+            maxStrategicAgents: 4,
+          });
+          if (result?.world) {
+            setWorld((current) => mergeRemoteWorld(current, result.world));
+          }
+        } catch {
+          // Keep the last authoritative snapshot; the next tick retries.
+        } finally {
+          busy = false;
+        }
+      };
+
+      const timer = window.setInterval(run, 6500);
+      return () => window.clearInterval(timer);
+    }
+
+    if (runtimeMode === "local") {
+      const delay = world.civilizationMode ? 2400 : 1800;
+      const timer = window.setInterval(() => {
+        setWorld((current) =>
+          advanceCivilization(
+            advanceWorld(ensureCivilizationState(current))
+          )
+        );
+      }, delay);
+      return () => window.clearInterval(timer);
+    }
+  }, [runtimeMode, world.running, world.civilizationMode]);
 
   const selectedAgent = useMemo(
-    () => world.agents.find((agent) => agent.id === world.selectedAgent) || world.agents[0],
+    () =>
+      world.agents.find((agent) => agent.id === world.selectedAgent) ||
+      world.agents[0],
     [world.agents, world.selectedAgent]
   );
 
-  const selectedRegion = getRegion(world.selectedRegion) || getRegion("genesis-port");
+  const selectedRegion =
+    getRegion(world.selectedRegion) ||
+    getRegion(selectedAgent?.regionId) ||
+    getRegion("genesis-port");
 
   async function connectWallet() {
     setWalletError("");
@@ -96,7 +179,11 @@ export default function App() {
       } catch {
         walletBalance = null;
       }
-      setWorld((current) => ({ ...current, wallet: publicKey, walletBalance }));
+      setWorld((current) => ({
+        ...current,
+        wallet: publicKey,
+        walletBalance,
+      }));
       return publicKey;
     } catch (error) {
       setWalletError(error?.message || "Wallet connection was cancelled.");
@@ -107,16 +194,52 @@ export default function App() {
   async function submitDeploy(event) {
     event.preventDefault();
     setWalletError("");
+
     if (!world.wallet) {
-      setWalletError("Connect Phantom first. Agents need a creator-signed Solana Devnet identity.");
+      setWalletError(
+        "Connect Phantom first. Agents need a creator-signed Solana Devnet identity."
+      );
       return;
     }
 
     setDeploying(true);
+
     try {
-      const identity = await createGenesisProof(window.solana, world.wallet, form);
-      setWorld((current) => ensureCivilizationState(deployAgent(current, form, identity)));
+      const identity = await createGenesisProof(
+        window.solana,
+        world.wallet,
+        form
+      );
+
+      if (runtimeMode === "shared") {
+        const result = await createSharedAgent(
+          { ...form, status: "BOUND" },
+          identity
+        );
+
+        if (result?.world) {
+          setWorld((current) =>
+            mergeRemoteWorld(
+              {
+                ...current,
+                selectedAgent: result.agent?.id,
+                selectedRegion:
+                  result.agent?.regionId ||
+                  result.agent?.zoneId ||
+                  "genesis-port",
+              },
+              result.world
+            )
+          );
+        }
+      } else {
+        setWorld((current) =>
+          ensureCivilizationState(deployAgent(current, form, identity))
+        );
+      }
+
       setDeployOpen(false);
+      setEntered(true);
     } catch (error) {
       setWalletError(error?.message || "Agent identity signing failed.");
     } finally {
@@ -124,40 +247,21 @@ export default function App() {
     }
   }
 
-  async function anchorCheckpoint() {
-    setWalletError("");
-    let wallet = world.wallet;
-    if (!wallet) wallet = await connectWallet();
-    if (!wallet) return;
-
-    setAnchoring(true);
-    try {
-      const receipt = await anchorWorldCheckpoint(window.solana, wallet, world);
-      setWorld((current) => registerChainAnchor(current, receipt));
-      const balance = await getDevnetBalance(wallet).catch(() => null);
-      if (balance != null) setWorld((current) => ({ ...current, walletBalance: balance }));
-    } catch (error) {
-      setWalletError(error?.message || "Solana Devnet checkpoint failed.");
-    } finally {
-      setAnchoring(false);
-    }
-  }
-
-  function resetWorld() {
-    if (!window.confirm("Reset the local Valhalla civilization?")) return;
-    const next = freshWorld();
-    next.wallet = world.wallet;
-    next.walletBalance = world.walletBalance;
-    setWorld(next);
-  }
-
-  function ignite() {
-    setWorld((current) => igniteCivilization(current, 100));
-  }
-
-  function forceBuild(agentId) {
+  async function releaseSelectedAgent(agentId) {
     if (!agentId) return;
-    setWorld((current) => buildPropertyForAgent(current, agentId));
+
+    try {
+      if (runtimeMode === "shared") {
+        const result = await releaseSharedAgent(agentId, world.wallet);
+        if (result?.world) {
+          setWorld((current) => mergeRemoteWorld(current, result.world));
+        }
+      } else {
+        setWorld((current) => releaseAgent(current, agentId));
+      }
+    } catch (error) {
+      setWalletError(error?.message || "Unable to release this agent.");
+    }
   }
 
   if (!entered) {
@@ -169,7 +273,11 @@ export default function App() {
           onDeploy={() => setDeployOpen(true)}
           onConnect={connectWallet}
         />
-        {walletError && <div className="landing-notice">{walletError}</div>}
+
+        {walletError && (
+          <div className="landing-notice">{walletError}</div>
+        )}
+
         {deployOpen && (
           <DeployModal
             form={form}
@@ -191,8 +299,12 @@ export default function App() {
         world={world}
         selectedAgent={selectedAgent}
         selectedRegion={selectedRegion}
+        runtimeMode={runtimeMode}
         onSelectRegion={(regionId) =>
-          setWorld((current) => ({ ...current, selectedRegion: regionId }))
+          setWorld((current) => ({
+            ...current,
+            selectedRegion: regionId,
+          }))
         }
         onSelectAgent={(agentId, regionId) =>
           setWorld((current) => ({
@@ -203,10 +315,13 @@ export default function App() {
         }
         onConnect={connectWallet}
         onDeploy={() => setDeployOpen(true)}
+        onRelease={releaseSelectedAgent}
         onExit={() => setEntered(false)}
       />
 
-      {walletError && <div className="landing-notice">{walletError}</div>}
+      {walletError && (
+        <div className="landing-notice">{walletError}</div>
+      )}
 
       {deployOpen && (
         <DeployModal
