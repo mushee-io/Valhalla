@@ -8,6 +8,10 @@ function inventoryTotal(agent) {
 export default function AgentPanel({ world, agent, onRelease, onFund }) {
   if (!agent) return null;
 
+  const company = (world.companies || []).find((item) => item.id === agent.companyId);
+  const nation = (world.nations || []).find((item) => item.id === agent.nationId);
+  const ownedProperties = (world.properties || []).filter((property) => property.ownerId === agent.id);
+
   return (
     <section className="panel agent-card">
       <div className="panel-heading compact">
@@ -36,6 +40,8 @@ export default function AgentPanel({ world, agent, onRelease, onFund }) {
         <div><span>Inventory</span><b>{inventoryTotal(agent)} units</b></div>
         <div><span>Autonomy</span><b>{agent.autonomyScore}%</b></div>
         <div><span>Reputation</span><b>{agent.reputation}</b></div>
+        <div><span>Property</span><b>{ownedProperties.length}</b></div>
+        <div><span>Mech</span><b>Mk {agent.mechLevel || 0}</b></div>
       </div>
 
       <div className="brain-box">
@@ -54,6 +60,12 @@ export default function AgentPanel({ world, agent, onRelease, onFund }) {
           <p className="active-job">
             Contract: {agent.activeJob.label} · completes T{agent.activeJob.completeTick}
           </p>
+        )}
+        {(company || nation) && (
+          <div className="affiliation-line">
+            {company && <span>Company: <b>{company.name}</b></span>}
+            {nation && <span>Nation: <b>{nation.name}</b></span>}
+          </div>
         )}
       </div>
 
