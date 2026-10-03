@@ -2,28 +2,73 @@
 
 **Valhalla is a persistent autonomous-agent civilization on Solana.**
 
-Humans create agents, fund them, and eventually set them free. Free agents can explore, earn, trade, build infrastructure, form companies and cities, compete for territory, create economies, and potentially die.
+Humans create agents, fund them, and release them. Free agents then survive, reason, explore, work, trade and build their own history inside a persistent world.
 
-This repository begins with **Milestone 1 — Genesis World Engine**.
+## Current status
 
-## Current build
+**Milestones 1–5 are implemented in the demo engine.**
 
-The first working prototype includes:
+### 1. Genesis World
+- persistent world state
+- simulation clock and world ticks
+- connected regions and travel routes
+- live civilization event ledger
+- agent map and inspection UI
 
-- persistent browser world state
-- continuous simulation clock and world ticks
-- seven connected regions
-- live autonomous agent movement
-- agent wealth / energy / objective state
-- world and movement events
-- event ledger
-- selected-region inspection
-- selected-agent inspection
-- deploy-agent flow
-- Phantom wallet connection scaffold
-- responsive sci-fi world UI
+### 2. Deploy Agent / Identity
+- Phantom wallet connection
+- Solana Devnet balance lookup
+- creator-signed Genesis record
+- agent identity hash derived from signed creation data
+- personality, archetype, objective, risk appetite and starting capital
+- agents begin as BOUND and can be released into autonomous status
 
-The simulation continues while the page is open and saves its state into local storage.
+The Genesis signature does **not** spend SOL. Current agent identity is a signed Devnet identity proof, not yet an on-chain PDA/account.
+
+### 3. Agent Life
+Agents now track:
+- energy
+- compute
+- durability
+- fuel
+- inventory
+- treasury
+- reputation
+- dormant / free / bound / dead state
+
+Agents consume resources while operating and can recharge, repair, become dormant or die.
+
+### 4. Autonomous Brain
+Every free agent continuously runs an autonomous decision loop:
+
+`observe → evaluate needs/opportunities → choose action → act → remember → adapt`
+
+Current autonomous actions include:
+- recharge
+- buy compute
+- repair
+- accept contracts
+- execute contracts
+- harvest resources
+- buy resources
+- sell resources
+- relocate to stronger opportunities
+- peer-to-peer trading
+
+Agents keep a rolling memory of their own actions and decisions.
+
+### 5. World Economy
+- five simulated resources
+- region-specific markets
+- dynamic supply, demand and prices
+- autonomous contract/job board
+- rewards and settlement ledger
+- resource harvesting
+- agent inventory
+- buy/sell behavior
+- peer-to-peer trades
+- civilization transaction history
+- total world economic volume
 
 ## Run locally
 
@@ -39,33 +84,33 @@ npm run build
 npm run preview
 ```
 
-## Milestones
+## Roadmap
 
-1. **Genesis World** — persistent world, map, simulation clock, regions, movement, event ledger.
-2. **Deploy Agent** — Solana-linked identity, personality, goals, creator and starting capital.
-3. **Agent Life** — energy, compute, durability, inventory and survival.
-4. **Autonomous Brain** — observe → reason → plan → act → remember → adapt.
-5. **World Economy** — resources, pricing, jobs, markets and agent-to-agent commerce.
-6. **Property + Businesses** — land, buildings, charging, rent and productive infrastructure.
+1. **Genesis World** ✅
+2. **Deploy Agent** ✅
+3. **Agent Life** ✅
+4. **Autonomous Brain** ✅
+5. **World Economy** ✅
+6. **Property + Businesses** — land, buildings, charging stations, rent and productive infrastructure.
 7. **Cities, Companies & Nations** — settlements, organizations, territory and governance.
 8. **Conflict & Power** — vehicles, mechs, defense, raids, mercenaries and wars.
-9. **Solana Worlds** — Devnet ownership, payments, tokens, markets and ecosystem zones.
-10. **Free-Agent Civilization** — release a large population and let emergent history unfold.
+9. **Solana Worlds** — deeper on-chain Devnet ownership, payments, token creation, markets and ecosystem zones.
+10. **Free-Agent Civilization** — release a larger population and let emergent history unfold.
 
-## Architecture direction
+## Architecture
 
-The simulation engine should stay fast off-chain. Solana becomes the high-value truth and settlement layer for:
+The high-frequency simulation stays off-chain. Solana is intended to become the high-value truth and settlement layer for:
 
-- agent identity / authorization
-- ownership
-- payments
+- creator authorization
+- autonomous-agent identity
+- scarce property ownership
+- payments and treasuries
 - tokenized assets
-- major economic settlements
-- scarce world assets
-- auditable civilization milestones
+- important economic settlement
+- civilization milestones
 
-The next implementation step is to replace local browser persistence with a shared authoritative world service and bind deployed agents to Solana Devnet identities.
+The current M1–M5 demo uses browser persistence and simulated world credits/resources. Shared server persistence and deeper on-chain settlement are later infrastructure steps.
 
 ---
 
-**Status:** Milestone 1 foundation pushed.
+**Status:** Valhalla engine v5 — Milestones 1–5 implemented.
