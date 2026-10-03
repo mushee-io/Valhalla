@@ -170,6 +170,8 @@ export function createSharedWorld() {
       checkpoints: [],
       propertyReceipts: [],
       treasuryReceipts: [],
+      tokenReceipts: [],
+      pendingIntents: [],
     },
     metrics: {
       totalVolume: 0,
