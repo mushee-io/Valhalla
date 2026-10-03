@@ -888,3 +888,43 @@ button:disabled {
   .civ-block.civ-wide { grid-column: auto; }
   .treasure-strip { grid-template-columns: 1fr 1fr; }
 }
+
+
+.region.has-city .region-core {
+  width: 22px;
+  height: 22px;
+  border-color: #f7ce61;
+  box-shadow: 0 0 0 8px rgba(247,206,97,.07), 0 0 26px rgba(247,206,97,.12);
+}
+.region.claimed-region .region-core {
+  outline: 1px solid rgba(157,119,255,.32);
+  outline-offset: 5px;
+}
+.city-crown {
+  position: absolute;
+  left: 50%;
+  top: -18px;
+  transform: translateX(-50%);
+  color: #f7ce61;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+.agent-dot.nation-agent span {
+  box-shadow: 0 0 0 2px rgba(157,119,255,.2), 0 0 10px rgba(198,222,255,.8);
+}
+.affiliation-line {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+.affiliation-line span {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.affiliation-line b {
+  color: #fff;
+  font-size: 9px;
+}
