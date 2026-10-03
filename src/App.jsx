@@ -30,6 +30,7 @@ import Ledger from "./ui/Ledger";
 import EconomyPanel from "./ui/EconomyPanel";
 import CivilizationPanel from "./ui/CivilizationPanel";
 import DeployModal from "./ui/DeployModal";
+import Landing from "./ui/Landing";
 
 const STORAGE_KEY = "valhalla-world-v10";
 
@@ -49,6 +50,7 @@ function loadWorld() {
 export default function App() {
   const [world, setWorld] = useState(loadWorld);
   const [deployOpen, setDeployOpen] = useState(false);
+  const [entered, setEntered] = useState(false);
   const [economyOpen, setEconomyOpen] = useState(true);
   const [walletError, setWalletError] = useState("");
   const [deploying, setDeploying] = useState(false);
@@ -154,6 +156,31 @@ export default function App() {
   function forceBuild(agentId) {
     if (!agentId) return;
     setWorld((current) => buildPropertyForAgent(current, agentId));
+  }
+
+  if (!entered) {
+    return (
+      <>
+        <Landing
+          world={world}
+          onEnter={() => setEntered(true)}
+          onDeploy={() => setDeployOpen(true)}
+          onConnect={connectWallet}
+        />
+        {walletError && <div className="landing-notice">{walletError}</div>}
+        {deployOpen && (
+          <DeployModal
+            form={form}
+            setForm={setForm}
+            wallet={world.wallet}
+            deploying={deploying}
+            onConnect={connectWallet}
+            onSubmit={submitDeploy}
+            onClose={() => setDeployOpen(false)}
+          />
+        )}
+      </>
+    );
   }
 
   return (
