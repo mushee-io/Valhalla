@@ -1,4 +1,4 @@
-export const WORLD_VERSION = 5;
+export const WORLD_VERSION = 10;
 
 export const RESOURCES = [
   { id: "energy", name: "Energy Cells", basePrice: 42 },
