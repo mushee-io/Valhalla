@@ -31,6 +31,7 @@ import EconomyPanel from "./ui/EconomyPanel";
 import CivilizationPanel from "./ui/CivilizationPanel";
 import DeployModal from "./ui/DeployModal";
 import Landing from "./ui/Landing";
+import UniverseConsole from "./ui/UniverseConsole";
 
 const STORAGE_KEY = "valhalla-world-v10";
 
@@ -184,97 +185,30 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <div className="brand-mark">V</div>
-          <div>
-            <div className="eyebrow">AUTONOMOUS CIVILIZATION</div>
-            <h1>VALHALLA</h1>
-          </div>
-        </div>
-
-        <div className="world-status">
-          <span className={`live-dot ${world.running ? "active" : ""}`} />
-          <div>
-            <strong>{world.running ? "WORLD LIVE" : "WORLD PAUSED"}</strong>
-            <span>{formatWorldTime(world)} · Tick {world.tick}</span>
-          </div>
-        </div>
-
-        <div className="header-actions">
-          <button className="ghost" onClick={() => setWorld((w) => ({ ...w, running: !w.running }))}>
-            {world.running ? "Pause world" : "Resume world"}
-          </button>
-          <button className="wallet" onClick={connectWallet}>
-            {world.wallet ? shortWallet(world.wallet) : "Connect Phantom"}
-          </button>
-          <button className="primary" onClick={() => setDeployOpen(true)}>Deploy agent</button>
-        </div>
-      </header>
-
-      {walletError && <div className="notice">{walletError}</div>}
-
-      <div className="milestone-bar">
-        <span className="milestone done">1 · WORLD</span>
-        <span className="milestone done">2 · IDENTITY</span>
-        <span className="milestone done">3 · LIFE</span>
-        <span className="milestone done">4 · BRAIN</span>
-        <span className="milestone done">5 · ECONOMY</span>
-        <span className="milestone done">6 · PROPERTY</span>
-        <span className="milestone done">7 · CITIES</span>
-        <span className="milestone done">8 · CONFLICT</span>
-        <span className="milestone done">9 · SOLANA</span>
-        <span className="milestone done">10 · CIVILIZATION</span>
-        <span className="network-chip">
-          SOLANA DEVNET
-          {world.walletBalance != null && <b>{world.walletBalance.toFixed(3)} SOL</b>}
-        </span>
-      </div>
-
-      <main className="layout">
-        <WorldMap
-          world={world}
-          selectedAgent={selectedAgent}
-          selectedRegion={selectedRegion}
-          onSelectRegion={(regionId) => setWorld((w) => ({ ...w, selectedRegion: regionId }))}
-          onSelectAgent={(agentId, regionId) =>
-            setWorld((w) => ({ ...w, selectedAgent: agentId, selectedRegion: regionId }))
-          }
-        />
-
-        <aside className="side-column">
-          <AgentPanel
-            world={world}
-            agent={selectedAgent}
-            onRelease={(agentId) => setWorld((w) => releaseAgent(w, agentId))}
-            onFund={(agentId, amount) => setWorld((w) => fundAgent(w, agentId, amount))}
-          />
-          <Ledger world={world} onReset={resetWorld} />
-        </aside>
-      </main>
-
-      <EconomyPanel
-        world={world}
-        region={selectedRegion}
-        agent={selectedAgent}
-        open={economyOpen}
-        onToggle={() => setEconomyOpen((value) => !value)}
-      />
-
-      <CivilizationPanel
+    <>
+      <UniverseConsole
         world={world}
         selectedAgent={selectedAgent}
-        anchoring={anchoring}
-        onIgnite={ignite}
-        onBuild={forceBuild}
-        onAnchor={anchorCheckpoint}
+        selectedRegion={selectedRegion}
+        onSelectRegion={(regionId) =>
+          setWorld((current) => ({ ...current, selectedRegion: regionId }))
+        }
+        onSelectAgent={(agentId, regionId) =>
+          setWorld((current) => ({
+            ...current,
+            selectedAgent: agentId,
+            selectedRegion: regionId,
+          }))
+        }
+        onConnect={connectWallet}
+        onDeploy={() => setDeployOpen(true)}
+        onToggleWorld={() =>
+          setWorld((current) => ({ ...current, running: !current.running }))
+        }
+        onExit={() => setEntered(false)}
       />
 
-      <footer>
-        <span>VALHALLA / MILESTONES 1–10 ONLINE / ENGINE V{WORLD_VERSION}</span>
-        <span>Agents → economy → property → cities → nations → conflict → verifiable Devnet history</span>
-      </footer>
+      {walletError && <div className="landing-notice">{walletError}</div>}
 
       {deployOpen && (
         <DeployModal
@@ -287,6 +221,6 @@ export default function App() {
           onClose={() => setDeployOpen(false)}
         />
       )}
-    </div>
+    </>
   );
 }
