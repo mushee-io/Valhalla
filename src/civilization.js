@@ -516,17 +516,45 @@ export function igniteCivilization(input, target = 100) {
 
 export function buildPropertyForAgent(input, agentId) {
   const world = ensureCivilizationState(input);
-  const events = [];
-  const forced = { ...world, tick: world.tick - (world.tick % 7) };
-  const agents = world.agents.map((agent) =>
-    agent.id === agentId ? { ...agent, wealth: Math.max(agent.wealth, 9000) } : agent
-  );
-  const result = maybeBuildProperty(forced, agents, world.tick, events);
+  const agents = world.agents.map((agent) => ({ ...agent }));
+  const builder = agents.find((agent) => agent.id === agentId);
+  if (!builder || builder.status === "DEAD") return world;
+
+  const type = propertyTypeFor(builder);
+  const existing = world.properties.filter((property) => property.ownerId === builder.id).length;
+  if (existing >= 6) return world;
+
+  const cost = type.cost;
+  if (builder.wealth < cost) {
+    builder.wealth += cost;
+  }
+  builder.wealth -= cost;
+  builder.property = (builder.property || 0) + 1;
+
+  const property = {
+    id: id("PROP", world.tick),
+    type: type.id,
+    name: `${builder.name} ${type.name}`,
+    ownerId: builder.id,
+    regionId: builder.regionId,
+    builtTick: world.tick,
+    value: cost,
+    fee: type.fee,
+    revenue: 0,
+    users: 0,
+    level: 1,
+    status: "ACTIVE",
+    rentEnabled: true,
+  };
+
   return {
     ...world,
-    agents: result.agents,
-    properties: result.properties,
-    events: [...events, ...world.events].slice(0, 180),
+    agents,
+    properties: [...world.properties, property],
+    events: [
+      civEvent(world.tick, "property", `${builder.name} built ${type.name}`, `${getRegion(builder.regionId)?.name}: infrastructure deployed for ${cost.toLocaleString()} credits.`),
+      ...world.events,
+    ].slice(0, 180),
   };
 }
 
