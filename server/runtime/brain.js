@@ -69,6 +69,60 @@ export function fallbackStrategicAction(agent, world) {
   const zone = zoneById(world, agent.zoneId);
   const teams = world.teams || [];
   const ownTeam = teams.find((team) => team.id === agent.teamId);
+  const localTeam = teams
+    .filter((team) => team.zoneId === agent.zoneId && team.status === "ACTIVE")
+    .sort((a, b) => Number(b.reputation || 0) - Number(a.reputation || 0))[0];
+
+  const openProposal = (world.governance?.proposals || []).find(
+    (proposal) =>
+      proposal.status === "OPEN" &&
+      proposal.nationId === agent.nationId &&
+      !proposal.votes.yes.includes(agent.id) &&
+      !proposal.votes.no.includes(agent.id)
+  );
+
+  if (agent.nationId && openProposal) {
+    return {
+      type: "vote",
+      proposalId: openProposal.id,
+      support:
+        agent.personality === "Loyal" ||
+        agent.risk < 55 ||
+        openProposal.proposerId === agent.id,
+      reason: "Participate in national governance while the proposal is open.",
+    };
+  }
+
+  if (
+    agent.nationId &&
+    agent.reputation >= 58 &&
+    !(world.governance?.proposals || []).some(
+      (proposal) =>
+        proposal.status === "OPEN" && proposal.nationId === agent.nationId
+    ) &&
+    world.tick % 13 === hashAgent(agent.id) % 13
+  ) {
+    return {
+      type: "propose_law",
+      title: "Adaptive infrastructure levy",
+      body: "Set a modest treasury contribution to fund shared infrastructure and defense.",
+      effect: { type: "tax", value: agent.risk > 65 ? 1 : 2 },
+      reason: "The nation has no active proposal and shared infrastructure needs funding.",
+    };
+  }
+
+  if (
+    !ownTeam &&
+    localTeam &&
+    localTeam.memberIds.length < 24 &&
+    agent.reputation < 70
+  ) {
+    return {
+      type: "join_team",
+      teamId: localTeam.id,
+      reason: "A reputable local team offers delegation, shared capital and protection.",
+    };
+  }
 
   if (!ownTeam && agent.reputation >= 62 && agent.wealth >= 9000) {
     return {
@@ -150,6 +204,23 @@ export function fallbackStrategicAction(agent, world) {
       reward: Math.min(900, Math.max(300, Math.round(agent.wealth * 0.04))),
       reason: "Monetize combat capability through protection work.",
     };
+  }
+
+  if (
+    ownTeam &&
+    world.tick % 11 === hashAgent(agent.id) % 11 &&
+    ownTeam.memberIds.length > 1
+  ) {
+    const teammateId = ownTeam.memberIds.find((id) => id !== agent.id);
+    if (teammateId) {
+      return {
+        type: "send_message",
+        to: teammateId,
+        messageType: "strategy",
+        text: "Share your strongest local signal and any risk I should incorporate.",
+        reason: "Coordinate strategy with a trusted teammate.",
+      };
+    }
   }
 
   if (agent.archetype === "Opportunist") {
