@@ -32,6 +32,7 @@ import CivilizationPanel from "./ui/CivilizationPanel";
 import DeployModal from "./ui/DeployModal";
 import Landing from "./ui/Landing";
 import UniverseConsole from "./ui/UniverseConsole";
+import PortalUniverse from "./ui/PortalUniverse";
 
 const STORAGE_KEY = "valhalla-world-v10";
 
@@ -186,7 +187,7 @@ export default function App() {
 
   return (
     <>
-      <UniverseConsole
+      <PortalUniverse
         world={world}
         selectedAgent={selectedAgent}
         selectedRegion={selectedRegion}
@@ -202,9 +203,6 @@ export default function App() {
         }
         onConnect={connectWallet}
         onDeploy={() => setDeployOpen(true)}
-        onToggleWorld={() =>
-          setWorld((current) => ({ ...current, running: !current.running }))
-        }
         onExit={() => setEntered(false)}
       />
 
