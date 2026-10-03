@@ -971,7 +971,7 @@ export function createAgentInWorld(world, input, identity = {}) {
     throw new Error("Agent identifier already exists.");
   }
 
-  const zoneId = input.zoneId || "genesis";
+  const zoneId = input.zoneId || "genesis-port";
   if (!zoneById(world, zoneId)) throw new Error("Invalid starting world.");
 
   const wealth = clamp(Number(input.wealth || 2500), 100, 100000);
