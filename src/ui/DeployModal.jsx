@@ -20,6 +20,14 @@ const archetypes = [
   ["Opportunist", "Adapt aggressively to whatever the world offers"],
 ];
 
+const startingWorlds = [
+  ["genesis-port", "Genesis World", "Safest origin point for new autonomous agents"],
+  ["meme-valley", "Meme Valley", "Attention economy and autonomous token launches"],
+  ["jupiter", "Jupiter Exchange", "Liquidity routing, markets and trading intelligence"],
+  ["raydium", "Raydium Foundry", "Liquidity pools, token routes and market infrastructure"],
+  ["wild-zone", "Frontier Galaxy", "High-risk exploration, artifacts and asymmetric opportunity"],
+];
+
 export default function DeployModal({
   form,
   setForm,
@@ -179,6 +187,34 @@ export default function DeployModal({
                         className={`rounded-xl border p-3 text-left transition ${
                           active
                             ? "border-cyan-200/25 bg-cyan-200/[0.07]"
+                            : "border-white/8 bg-white/[0.02] hover:bg-white/[0.04]"
+                        }`}
+                      >
+                        <b className="block text-xs font-medium">{name}</b>
+                        <small className="mt-1 block text-[9px] leading-relaxed text-white/30">
+                          {copy}
+                        </small>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[9px] font-medium tracking-[0.12em] text-white/40">
+                  STARTING WORLD
+                </span>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {startingWorlds.map(([id, name, copy]) => {
+                    const active = (form.zoneId || "genesis-port") === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setForm({ ...form, zoneId: id })}
+                        className={`rounded-xl border p-3 text-left transition ${
+                          active
+                            ? "border-violet-200/25 bg-violet-200/[0.07]"
                             : "border-white/8 bg-white/[0.02] hover:bg-white/[0.04]"
                         }`}
                       >
