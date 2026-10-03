@@ -8,17 +8,27 @@ export default function WorldMap({ world, selectedAgent, selectedRegion, onSelec
   const openJobs = world.jobs.filter(
     (job) => job.status === "OPEN" && job.regionId === selectedRegion.id
   );
+  const localProperties = (world.properties || []).filter(
+    (property) => property.regionId === selectedRegion.id
+  );
+  const localCity = (world.settlements || []).find(
+    (settlement) => settlement.regionId === selectedRegion.id
+  );
+  const controllingNation = (world.nations || []).find(
+    (nation) => nation.regions.includes(selectedRegion.id)
+  );
 
   return (
     <section className="map-panel panel">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">GENESIS WORLD · ENGINE V5</span>
-          <h2>Agents are alive, reasoning and trading.</h2>
+          <span className="eyebrow">GENESIS WORLD · ENGINE V10</span>
+          <h2>Agents now build civilization.</h2>
         </div>
         <div className="stats-inline">
           <span><b>{world.agents.filter((agent) => agent.status !== "DEAD").length}</b> alive</span>
-          <span><b>{world.agents.filter((agent) => agent.status === "FREE").length}</b> free</span>
+          <span><b>{(world.settlements || []).length}</b> cities</span>
+          <span><b>{(world.nations || []).length}</b> nations</span>
           <span><b>{Math.round(world.totalVolume || 0).toLocaleString()}</b> volume</span>
         </div>
       </div>
@@ -46,17 +56,23 @@ export default function WorldMap({ world, selectedAgent, selectedRegion, onSelec
           const count = world.agents.filter(
             (agent) => agent.regionId === region.id && agent.status !== "DEAD"
           ).length;
+          const city = (world.settlements || []).find((settlement) => settlement.regionId === region.id);
+          const nation = (world.nations || []).find((item) => item.regions.includes(region.id));
           return (
             <button
               key={region.id}
-              className={`region region-${region.kind} ${region.id === selectedRegion.id ? "selected" : ""}`}
+              className={`region region-${region.kind} ${region.id === selectedRegion.id ? "selected" : ""} ${city ? "has-city" : ""} ${nation ? "claimed-region" : ""}`}
               style={{ left: `${region.x}%`, top: `${region.y}%` }}
               onClick={() => onSelectRegion(region.id)}
             >
               <span className="region-core" />
+              {city && <span className="city-crown">CITY</span>}
               <span className="region-label">
-                <b>{region.name}</b>
-                <small>{count} active · {region.specialty}</small>
+                <b>{city ? city.name : region.name}</b>
+                <small>
+                  {count} active · {region.specialty}
+                  {nation ? ` · ${nation.name}` : ""}
+                </small>
               </span>
             </button>
           );
@@ -72,7 +88,7 @@ export default function WorldMap({ world, selectedAgent, selectedRegion, onSelec
               <button
                 key={agent.id}
                 title={`${agent.name} · ${agent.status} · ${agent.lastAction}`}
-                className={`agent-dot agent-${agent.status.toLowerCase()} ${agent.id === selectedAgent?.id ? "selected" : ""}`}
+                className={`agent-dot agent-${agent.status.toLowerCase()} ${agent.id === selectedAgent?.id ? "selected" : ""} ${agent.nationId ? "nation-agent" : ""}`}
                 style={{
                   left: `${region.x + Math.cos(angle) * radius}%`,
                   top: `${region.y + Math.sin(angle) * radius}%`,
@@ -95,13 +111,17 @@ export default function WorldMap({ world, selectedAgent, selectedRegion, onSelec
       <div className="region-strip">
         <div>
           <span className="eyebrow">SELECTED REGION</span>
-          <h3>{selectedRegion.name}</h3>
-          <p>{selectedRegion.subtitle}</p>
+          <h3>{localCity ? localCity.name : selectedRegion.name}</h3>
+          <p>
+            {selectedRegion.subtitle}
+            {controllingNation ? ` · controlled by ${controllingNation.name}` : " · independent"}
+          </p>
         </div>
         <div className="region-metrics">
           <div><span>Risk</span><b>{selectedRegion.risk}%</b></div>
           <div><span>Specialty</span><b>{selectedRegion.specialty}</b></div>
           <div><span>Agents here</span><b>{regionAgents.length}</b></div>
+          <div><span>Properties</span><b>{localProperties.length}</b></div>
           <div><span>Open jobs</span><b>{openJobs.length}</b></div>
         </div>
       </div>
