@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronRight,
   CircleDot,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { getRegion, shortWallet } from "../world";
 import UniverseLayerPanel from "./UniverseLayerPanel";
+import AgentDossier from "./AgentDossier";
 
 type PortalUniverseProps = {
   world: any;
@@ -66,6 +67,7 @@ export default function PortalUniverse({
     useState<(typeof tabs)[number]>("Agents");
   const [query, setQuery] = useState("");
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [dossierOpen, setDossierOpen] = useState(false);
 
   const aliveAgents = useMemo(
     () =>
@@ -463,6 +465,13 @@ export default function PortalUniverse({
             </p>
 
             <div className="ml-4 flex shrink-0 items-center gap-3">
+              <button
+                onClick={() => setDossierOpen(true)}
+                className="rounded-full border border-white/20 bg-white/[0.05] px-3 py-2 text-[9px] text-white/75 backdrop-blur-md"
+              >
+                Agent dossier
+              </button>
+
               {selectedAgent?.status === "BOUND" && (
                 <button
                   onClick={() =>
@@ -486,6 +495,16 @@ export default function PortalUniverse({
           </div>
         </section>
       )}
+
+      <AnimatePresence>
+        {dossierOpen && (
+          <AgentDossier
+            world={world}
+            agent={selectedAgent}
+            onClose={() => setDossierOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="absolute right-5 top-[110px] z-20 hidden items-center gap-3 rounded-full border border-white/22 bg-black/10 px-3 py-2 text-[9px] text-white/60 backdrop-blur-md lg:flex">
         <span>{(world.teams || world.companies || []).length} teams</span>
