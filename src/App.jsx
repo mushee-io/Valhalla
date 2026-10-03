@@ -11,21 +11,38 @@ import {
   releaseAgent,
   shortWallet,
 } from "./world";
-import { connectPhantom, createGenesisProof, getDevnetBalance } from "./solana";
+import {
+  advanceCivilization,
+  buildPropertyForAgent,
+  ensureCivilizationState,
+  igniteCivilization,
+  registerChainAnchor,
+} from "./civilization";
+import {
+  anchorWorldCheckpoint,
+  connectPhantom,
+  createGenesisProof,
+  getDevnetBalance,
+} from "./solana";
 import WorldMap from "./ui/WorldMap";
 import AgentPanel from "./ui/AgentPanel";
 import Ledger from "./ui/Ledger";
 import EconomyPanel from "./ui/EconomyPanel";
+import CivilizationPanel from "./ui/CivilizationPanel";
 import DeployModal from "./ui/DeployModal";
 
-const STORAGE_KEY = "valhalla-world-v5";
+const STORAGE_KEY = "valhalla-world-v10";
+
+function freshWorld() {
+  return ensureCivilizationState(createInitialWorld());
+}
 
 function loadWorld() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? migrateWorld(JSON.parse(raw)) : createInitialWorld();
+    return raw ? ensureCivilizationState(migrateWorld(JSON.parse(raw))) : freshWorld();
   } catch {
-    return createInitialWorld();
+    return freshWorld();
   }
 }
 
@@ -35,6 +52,7 @@ export default function App() {
   const [economyOpen, setEconomyOpen] = useState(true);
   const [walletError, setWalletError] = useState("");
   const [deploying, setDeploying] = useState(false);
+  const [anchoring, setAnchoring] = useState(false);
   const [form, setForm] = useState({
     name: "VALKYRIE",
     archetype: "Builder",
@@ -50,11 +68,12 @@ export default function App() {
 
   useEffect(() => {
     if (!world.running) return;
-    const id = window.setInterval(() => {
-      setWorld((current) => advanceWorld(current));
-    }, 1800);
-    return () => window.clearInterval(id);
-  }, [world.running]);
+    const delay = world.civilizationMode ? 2400 : 1800;
+    const timer = window.setInterval(() => {
+      setWorld((current) => advanceCivilization(advanceWorld(ensureCivilizationState(current))));
+    }, delay);
+    return () => window.clearInterval(timer);
+  }, [world.running, world.civilizationMode]);
 
   const selectedAgent = useMemo(
     () => world.agents.find((agent) => agent.id === world.selectedAgent) || world.agents[0],
@@ -74,8 +93,10 @@ export default function App() {
         walletBalance = null;
       }
       setWorld((current) => ({ ...current, wallet: publicKey, walletBalance }));
+      return publicKey;
     } catch (error) {
       setWalletError(error?.message || "Wallet connection was cancelled.");
+      return null;
     }
   }
 
@@ -90,7 +111,7 @@ export default function App() {
     setDeploying(true);
     try {
       const identity = await createGenesisProof(window.solana, world.wallet, form);
-      setWorld((current) => deployAgent(current, form, identity));
+      setWorld((current) => ensureCivilizationState(deployAgent(current, form, identity)));
       setDeployOpen(false);
     } catch (error) {
       setWalletError(error?.message || "Agent identity signing failed.");
@@ -99,12 +120,40 @@ export default function App() {
     }
   }
 
+  async function anchorCheckpoint() {
+    setWalletError("");
+    let wallet = world.wallet;
+    if (!wallet) wallet = await connectWallet();
+    if (!wallet) return;
+
+    setAnchoring(true);
+    try {
+      const receipt = await anchorWorldCheckpoint(window.solana, wallet, world);
+      setWorld((current) => registerChainAnchor(current, receipt));
+      const balance = await getDevnetBalance(wallet).catch(() => null);
+      if (balance != null) setWorld((current) => ({ ...current, walletBalance: balance }));
+    } catch (error) {
+      setWalletError(error?.message || "Solana Devnet checkpoint failed.");
+    } finally {
+      setAnchoring(false);
+    }
+  }
+
   function resetWorld() {
     if (!window.confirm("Reset the local Valhalla civilization?")) return;
-    const next = createInitialWorld();
+    const next = freshWorld();
     next.wallet = world.wallet;
     next.walletBalance = world.walletBalance;
     setWorld(next);
+  }
+
+  function ignite() {
+    setWorld((current) => igniteCivilization(current, 100));
+  }
+
+  function forceBuild(agentId) {
+    if (!agentId) return;
+    setWorld((current) => buildPropertyForAgent(current, agentId));
   }
 
   return (
@@ -145,7 +194,11 @@ export default function App() {
         <span className="milestone done">3 · LIFE</span>
         <span className="milestone done">4 · BRAIN</span>
         <span className="milestone done">5 · ECONOMY</span>
-        <span className="milestone">6 · PROPERTY</span>
+        <span className="milestone done">6 · PROPERTY</span>
+        <span className="milestone done">7 · CITIES</span>
+        <span className="milestone done">8 · CONFLICT</span>
+        <span className="milestone done">9 · SOLANA</span>
+        <span className="milestone done">10 · CIVILIZATION</span>
         <span className="network-chip">
           SOLANA DEVNET
           {world.walletBalance != null && <b>{world.walletBalance.toFixed(3)} SOL</b>}
@@ -182,9 +235,18 @@ export default function App() {
         onToggle={() => setEconomyOpen((value) => !value)}
       />
 
+      <CivilizationPanel
+        world={world}
+        selectedAgent={selectedAgent}
+        anchoring={anchoring}
+        onIgnite={ignite}
+        onBuild={forceBuild}
+        onAnchor={anchorCheckpoint}
+      />
+
       <footer>
-        <span>VALHALLA / MILESTONES 1–5 ONLINE / ENGINE V{WORLD_VERSION}</span>
-        <span>Creator-signed Devnet identity · survival · autonomous brain · emergent economy</span>
+        <span>VALHALLA / MILESTONES 1–10 ONLINE / ENGINE V{WORLD_VERSION}</span>
+        <span>Agents → economy → property → cities → nations → conflict → verifiable Devnet history</span>
       </footer>
 
       {deployOpen && (
