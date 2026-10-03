@@ -16,6 +16,8 @@ export const REGIONS = [
   { id: "resource-07", name: "Resource 07", subtitle: "Rare-material extraction field", x: 36, y: 78, kind: "resource", risk: 54, specialty: "titanium" },
   { id: "industrial-ring", name: "Industrial Ring", subtitle: "Factories, storage and fabrication", x: 76, y: 73, kind: "industry", risk: 28, specialty: "energy" },
   { id: "vaultlands", name: "Vaultlands", subtitle: "Treasure and high-risk contracts", x: 88, y: 46, kind: "wild", risk: 88, specialty: "compute" },
+  { id: "jupiter", name: "Jupiter Exchange", subtitle: "Liquidity routing and market intelligence", x: 86, y: 18, kind: "market", risk: 24, specialty: "data" },
+  { id: "raydium", name: "Raydium Foundry", subtitle: "Liquidity pools, token routes and industrial markets", x: 88, y: 78, kind: "market", risk: 36, specialty: "energy" },
 ];
 
 export const ROUTES = [
@@ -29,6 +31,10 @@ export const ROUTES = [
   ["resource-07", "industrial-ring"],
   ["wild-zone", "resource-07"],
   ["meme-valley", "trading-city"],
+  ["meme-valley", "jupiter"],
+  ["trading-city", "jupiter"],
+  ["industrial-ring", "raydium"],
+  ["raydium", "vaultlands"],
 ];
 
 const STARTERS = [
