@@ -312,6 +312,23 @@ function executeFoundTeam(world, agent, action) {
 
   agent.teamId = team.id;
   world.teams.push(team);
+  world.chain = world.chain || {
+    checkpoints: [],
+    propertyReceipts: [],
+    treasuryReceipts: [],
+    tokenReceipts: [],
+    pendingIntents: [],
+  };
+  world.chain.pendingIntents = world.chain.pendingIntents || [];
+  world.chain.pendingIntents.push({
+    id: id("chain-intent", world, agent.id),
+    type: "CREATE_TEAM_TREASURY",
+    actorId: agent.id,
+    teamId: team.id,
+    amount: team.treasury,
+    status: "PENDING",
+    createdAtTick: world.tick,
+  });
   return { ok: true, text: `Founded ${team.name}.` };
 }
 
@@ -356,6 +373,24 @@ function executeProperty(world, agent, action) {
   };
 
   world.properties.push(property);
+  world.chain = world.chain || {
+    checkpoints: [],
+    propertyReceipts: [],
+    treasuryReceipts: [],
+    tokenReceipts: [],
+    pendingIntents: [],
+  };
+  world.chain.pendingIntents = world.chain.pendingIntents || [];
+  world.chain.pendingIntents.push({
+    id: id("chain-intent", world, agent.id),
+    type: "REGISTER_PROPERTY",
+    actorId: agent.id,
+    propertyId: property.id,
+    zoneId: property.zoneId,
+    value: property.value,
+    status: "PENDING",
+    createdAtTick: world.tick,
+  });
   agent.properties = [...(agent.properties || []), property.id];
   agent.property = Number(agent.property || 0) + 1;
 
@@ -406,6 +441,24 @@ function executeTokenLaunch(world, agent, action) {
   };
 
   world.memeTokens.push(token);
+  world.chain = world.chain || {
+    checkpoints: [],
+    propertyReceipts: [],
+    treasuryReceipts: [],
+    tokenReceipts: [],
+    pendingIntents: [],
+  };
+  world.chain.pendingIntents = world.chain.pendingIntents || [];
+  world.chain.pendingIntents.push({
+    id: id("chain-intent", world, agent.id),
+    type: "REGISTER_TOKEN",
+    actorId: agent.id,
+    tokenId: token.id,
+    ticker: token.ticker,
+    liquidity: token.liquidity,
+    status: "PENDING",
+    createdAtTick: world.tick,
+  });
   world.metrics.tokensLaunched += 1;
   world.metrics.totalFees += launchFee;
   return { ok: true, text: `Launched ${token.ticker} with ${liquidity} credits of liquidity.` };
@@ -755,6 +808,23 @@ function civilizationEvolution(world) {
           foundedAtTick: world.tick,
         };
         world.nations.push(nation);
+        world.chain = world.chain || {
+          checkpoints: [],
+          propertyReceipts: [],
+          treasuryReceipts: [],
+          tokenReceipts: [],
+          pendingIntents: [],
+        };
+        world.chain.pendingIntents = world.chain.pendingIntents || [];
+        world.chain.pendingIntents.push({
+          id: id("chain-intent", world, leader.id),
+          type: "CREATE_NATION_TREASURY",
+          actorId: leader.id,
+          nationId: nation.id,
+          amount: nation.treasury,
+          status: "PENDING",
+          createdAtTick: world.tick,
+        });
         city.nationId = nation.id;
         for (const memberId of team.memberIds) {
           const member = world.agents.find((agent) => agent.id === memberId);
