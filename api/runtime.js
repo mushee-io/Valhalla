@@ -17,6 +17,18 @@ import {
   listHash44EquipmentInWorld,
   cancelHash44EquipmentListingInWorld,
   buyListedHash44EquipmentInWorld,
+  buildHash44BusinessInWorld,
+  useHash44BusinessInWorld,
+  buildHash44GpuCentreInWorld,
+  useHash44GpuCentreInWorld,
+  buildHash44RepairCentreInWorld,
+  useHash44RepairCentreInWorld,
+  buyHash44VehicleInWorld,
+  createHash44TransportRouteInWorld,
+  useHash44TransportRouteInWorld,
+  investHash44BusinessInWorld,
+  borrowHash44CreditsInWorld,
+  repayHash44LoanInWorld,
 } from "../server/runtime/engine.js";
 import {
   verifyDevnetTransfer,
@@ -525,6 +537,182 @@ export default async function handler(req, res) {
       return send(res, 200, { ok: true, equipment, world: publicWorld(world) });
     }
 
+
+
+    if (op === "hash44_build_business") {
+      verifyAction(input, "build_business");
+      let business = null;
+      const world = await mutateWorld((state) => {
+        business = buildHash44BusinessInWorld(state, {
+          agentId: input.agentId,
+          plotId: input.plotId,
+          businessType: input.businessType,
+          wallet: input.wallet,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, business, world: publicWorld(world) });
+    }
+
+    if (op === "hash44_use_business") {
+      verifyAction(input, "use_business");
+      let business = null;
+      const world = await mutateWorld((state) => {
+        business = useHash44BusinessInWorld(state, {
+          agentId: input.agentId,
+          businessId: input.businessId,
+          wallet: input.wallet,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, business, world: publicWorld(world) });
+    }
+
+    if (op === "hash44_build_gpu") {
+      verifyAction(input, "build_gpu");
+      let centre = null;
+      const world = await mutateWorld((state) => {
+        centre = buildHash44GpuCentreInWorld(state, {
+          agentId: input.agentId,
+          plotId: input.plotId,
+          centreType: input.centreType,
+          wallet: input.wallet,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, centre, world: publicWorld(world) });
+    }
+
+    if (op === "hash44_use_gpu") {
+      verifyAction(input, "use_gpu");
+      let centre = null;
+      const world = await mutateWorld((state) => {
+        centre = useHash44GpuCentreInWorld(state, {
+          agentId: input.agentId,
+          centreId: input.centreId,
+          wallet: input.wallet,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, centre, world: publicWorld(world) });
+    }
+
+    if (op === "hash44_build_repair") {
+      verifyAction(input, "build_repair");
+      let centre = null;
+      const world = await mutateWorld((state) => {
+        centre = buildHash44RepairCentreInWorld(state, {
+          agentId: input.agentId,
+          plotId: input.plotId,
+          centreType: input.centreType,
+          wallet: input.wallet,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, centre, world: publicWorld(world) });
+    }
+
+    if (op === "hash44_use_repair") {
+      verifyAction(input, "use_repair");
+      let centre = null;
+      const world = await mutateWorld((state) => {
+        centre = useHash44RepairCentreInWorld(state, {
+          agentId: input.agentId,
+          centreId: input.centreId,
+          wallet: input.wallet,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, centre, world: publicWorld(world) });
+    }
+
+    if (op === "hash44_buy_vehicle") {
+      verifyAction(input, "buy_vehicle");
+      let vehicle = null;
+      const world = await mutateWorld((state) => {
+        vehicle = buyHash44VehicleInWorld(state, {
+          agentId: input.agentId,
+          vehicleType: input.vehicleType,
+          wallet: input.wallet,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, vehicle, world: publicWorld(world) });
+    }
+
+    if (op === "hash44_create_route") {
+      verifyAction(input, "create_route");
+      let route = null;
+      const world = await mutateWorld((state) => {
+        route = createHash44TransportRouteInWorld(state, {
+          agentId: input.agentId,
+          vehicleId: input.vehicleId,
+          fromPlotId: input.fromPlotId,
+          toPlotId: input.toPlotId,
+          wallet: input.wallet,
+          fareCredits: input.fareCredits,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, route, world: publicWorld(world) });
+    }
+
+    if (op === "hash44_use_route") {
+      verifyAction(input, "use_route");
+      let route = null;
+      const world = await mutateWorld((state) => {
+        route = useHash44TransportRouteInWorld(state, {
+          agentId: input.agentId,
+          routeId: input.routeId,
+          wallet: input.wallet,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, route, world: publicWorld(world) });
+    }
+
+    if (op === "hash44_invest_business") {
+      verifyAction(input, "invest_business");
+      let holding = null;
+      const world = await mutateWorld((state) => {
+        holding = investHash44BusinessInWorld(state, {
+          agentId: input.agentId,
+          businessId: input.businessId,
+          shares: input.shares,
+          wallet: input.wallet,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, holding, world: publicWorld(world) });
+    }
+
+    if (op === "hash44_borrow") {
+      verifyAction(input, "borrow");
+      let loan = null;
+      const world = await mutateWorld((state) => {
+        loan = borrowHash44CreditsInWorld(state, {
+          agentId: input.agentId,
+          amountCredits: input.amountCredits,
+          wallet: input.wallet,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, loan, world: publicWorld(world) });
+    }
+
+    if (op === "hash44_repay_loan") {
+      verifyAction(input, "repay_loan");
+      let loan = null;
+      const world = await mutateWorld((state) => {
+        loan = repayHash44LoanInWorld(state, {
+          agentId: input.agentId,
+          loanId: input.loanId,
+          wallet: input.wallet,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, loan, world: publicWorld(world) });
+    }
 
     return send(res, 400, { ok: false, error: `Unknown runtime operation: ${op}` });
   } catch (error) {
