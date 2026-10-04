@@ -3,6 +3,7 @@ import {
   PublicKey,
   Transaction,
   TransactionInstruction,
+  SystemProgram,
 } from "@solana/web3.js";
 
 export const DEVNET_RPC = "https://api.devnet.solana.com";
@@ -120,6 +121,103 @@ export async function anchorWorldCheckpoint(provider, publicKey, world) {
     signature,
     network: "solana-devnet",
     memo: summary,
+    explorerUrl: `https://explorer.solana.com/tx/${signature}?cluster=devnet`,
+  };
+}
+
+
+function signatureToBase64(signature) {
+  const bytes =
+    signature instanceof Uint8Array
+      ? signature
+      : new Uint8Array(signature);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+export async function signHash44Action(provider, publicKey, action, payload = {}) {
+  if (!provider?.signMessage) {
+    throw new Error("This wallet does not support message signing.");
+  }
+
+  const message = [
+    "HASH44 ACTION",
+    `wallet=${publicKey}`,
+    `action=${action}`,
+    `payload=${JSON.stringify(payload)}`,
+    `nonce=${crypto.randomUUID()}`,
+    `timestamp=${new Date().toISOString()}`,
+  ].join("\n");
+
+  const encoded = new TextEncoder().encode(message);
+  const signed = await provider.signMessage(encoded, "utf8");
+  const signature = signed.signature || signed;
+
+  return {
+    message,
+    signatureBase64: signatureToBase64(signature),
+  };
+}
+
+export async function sendHash44Payment(
+  provider,
+  publicKey,
+  destination,
+  lamports,
+  memo
+) {
+  if (!provider?.signAndSendTransaction) {
+    throw new Error("Phantom transaction signing is unavailable.");
+  }
+  if (!destination) {
+    throw new Error("Hash 44 treasury wallet is not configured.");
+  }
+
+  const connection = new Connection(DEVNET_RPC, "confirmed");
+  const signer = new PublicKey(publicKey);
+  const receiver = new PublicKey(destination);
+  const amount = Math.max(1, Math.round(Number(lamports)));
+
+  const { blockhash, lastValidBlockHeight } =
+    await connection.getLatestBlockhash("confirmed");
+
+  const tx = new Transaction({
+    feePayer: signer,
+    recentBlockhash: blockhash,
+  });
+
+  tx.add(
+    SystemProgram.transfer({
+      fromPubkey: signer,
+      toPubkey: receiver,
+      lamports: amount,
+    })
+  );
+
+  tx.add(
+    new TransactionInstruction({
+      programId: MEMO_PROGRAM_ID,
+      keys: [{ pubkey: signer, isSigner: true, isWritable: false }],
+      data: new TextEncoder().encode(
+        String(memo || "HASH44").slice(0, 300)
+      ),
+    })
+  );
+
+  const result = await provider.signAndSendTransaction(tx);
+  const signature =
+    typeof result === "string" ? result : result.signature;
+
+  await connection.confirmTransaction(
+    { signature, blockhash, lastValidBlockHeight },
+    "confirmed"
+  );
+
+  return {
+    signature,
+    lamports: amount,
+    network: "solana-devnet",
     explorerUrl: `https://explorer.solana.com/tx/${signature}?cluster=devnet`,
   };
 }
