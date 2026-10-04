@@ -20,10 +20,13 @@ import {
   getHash44Config,
   hash44Build,
   hash44BuyEquipment,
+  hash44BuyEquipmentListing,
   hash44BuyLand,
   hash44BuyListing,
   hash44CancelListing,
   hash44Charge,
+  hash44CancelEquipmentListing,
+  hash44ListEquipment,
   hash44ListProperty,
   hash44Rent,
   hash44SetRent,
@@ -66,6 +69,7 @@ export default function Hash44World({
   const [saleSol, setSaleSol] = useState("0.0010");
   const [rentSol, setRentSol] = useState("0.0002");
   const [transferTarget, setTransferTarget] = useState("");
+  const [equipmentSaleSol, setEquipmentSaleSol] = useState("0.0003");
 
   const hash44 = world.hash44;
   const plots = hash44?.plots || [];
@@ -130,6 +134,14 @@ export default function Hash44World({
         (structure: any) => structure.ownerAgentId === selectedAgent?.id
       ),
     [structures, selectedAgent?.id]
+  );
+
+  const equipmentListings = useMemo(
+    () =>
+      (hash44?.equipmentMarket || []).filter(
+        (listing: any) => listing.status === "LISTED"
+      ),
+    [hash44?.equipmentMarket]
   );
 
   const ensureWallet = async () => {
@@ -376,6 +388,71 @@ export default function Hash44World({
         structureId: station.id,
         wallet: address,
         signature,
+      });
+    });
+
+
+  const listEquipment = (item: any) =>
+    run("list-equipment", async () => {
+      const address = await ensureWallet();
+      ensureAgentControl(address);
+      const priceLamports = Math.max(
+        50000,
+        Math.round(Number(equipmentSaleSol || 0) * 1_000_000_000)
+      );
+      const proof = await signHash44Action(
+        window.solana,
+        address,
+        "list_equipment",
+        {
+          agentId: selectedAgent.id,
+          ownedItemId: item.id,
+          priceLamports,
+        }
+      );
+      return hash44ListEquipment({
+        agentId: selectedAgent.id,
+        ownedItemId: item.id,
+        wallet: address,
+        priceLamports,
+        proof,
+      });
+    });
+
+  const cancelEquipmentListing = (item: any) =>
+    run("cancel-equipment", async () => {
+      const address = await ensureWallet();
+      ensureAgentControl(address);
+      const proof = await signHash44Action(
+        window.solana,
+        address,
+        "cancel_equipment_listing",
+        { agentId: selectedAgent.id, ownedItemId: item.id }
+      );
+      return hash44CancelEquipmentListing({
+        agentId: selectedAgent.id,
+        ownedItemId: item.id,
+        wallet: address,
+        proof,
+      });
+    });
+
+  const buyEquipmentListing = (listing: any) =>
+    run("buy-equipment-listing", async () => {
+      const address = await ensureWallet();
+      ensureAgentControl(address);
+      const payment = await sendHash44Payment(
+        window.solana,
+        address,
+        listing.sellerWallet,
+        Number(listing.priceLamports),
+        `HASH44 EQUIPMENT TRADE|${selectedAgent.id}|${listing.ownedItemId}`
+      );
+      return hash44BuyEquipmentListing({
+        agentId: selectedAgent.id,
+        ownedItemId: listing.ownedItemId,
+        wallet: address,
+        signature: payment.signature,
       });
     });
 
@@ -977,59 +1054,135 @@ export default function Hash44World({
           )}
 
           {view === "Equipment" && (
-            <div className="grid gap-5 xl:grid-cols-[1fr_330px]">
-              <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {(hash44.equipmentCatalog || []).map((item: any) => (
-                  <article
-                    key={item.id}
-                    className="rounded-[22px] border border-white/10 bg-white/[0.025] p-5"
-                  >
-                    <span className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.03]">
-                      {item.category === "armour" ? (
-                        <Shield size={16} />
-                      ) : item.category === "clothing" ? (
-                        <ShoppingBag size={16} />
-                      ) : (
-                        <Package size={16} />
-                      )}
+            <div className="grid gap-5 xl:grid-cols-[1fr_350px]">
+              <section className="space-y-6">
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-lg font-medium">Equipment store</h3>
+                    <span className="text-[8px] uppercase tracking-[0.1em] text-white/35">
+                      Clothing · Armour · Tools · Upgrades
                     </span>
-                    <h3 className="mt-5 text-base font-medium">{item.name}</h3>
-                    <p className="mt-1 text-[9px] uppercase tracking-[0.08em] text-white/35">
-                      {item.category}
-                    </p>
-                    <b className="mt-4 block text-xs">
-                      {sol(item.costLamports)} SOL
-                    </b>
-                    <button
-                      onClick={() => buyEquipment(item)}
-                      disabled={Boolean(busy)}
-                      className="mt-4 w-full rounded-xl bg-white py-2.5 text-[10px] font-medium text-black"
-                    >
-                      Buy equipment
-                    </button>
-                  </article>
-                ))}
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {(hash44.equipmentCatalog || []).map((item: any) => (
+                      <article
+                        key={item.id}
+                        className="rounded-[22px] border border-white/10 bg-white/[0.025] p-5"
+                      >
+                        <span className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.03]">
+                          {item.category === "armour" ? (
+                            <Shield size={16} />
+                          ) : item.category === "clothing" ? (
+                            <ShoppingBag size={16} />
+                          ) : (
+                            <Package size={16} />
+                          )}
+                        </span>
+                        <h3 className="mt-5 text-base font-medium">{item.name}</h3>
+                        <p className="mt-1 text-[9px] uppercase tracking-[0.08em] text-white/35">
+                          {item.category}
+                        </p>
+                        <b className="mt-4 block text-xs">
+                          {sol(item.costLamports)} SOL
+                        </b>
+                        <button
+                          onClick={() => buyEquipment(item)}
+                          disabled={Boolean(busy)}
+                          className="mt-4 w-full rounded-xl bg-white py-2.5 text-[10px] font-medium text-black disabled:opacity-40"
+                        >
+                          Buy equipment
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-white/10 pt-5">
+                  <h3 className="text-lg font-medium">Agent equipment market</h3>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {equipmentListings.length ? (
+                      equipmentListings.map((listing: any) => (
+                        <article
+                          key={listing.id}
+                          className="rounded-[20px] border border-white/10 bg-white/[0.02] p-4"
+                        >
+                          <b className="block truncate text-sm">{listing.name}</b>
+                          <span className="mt-1 block text-[9px] text-white/35">
+                            Seller: {listing.sellerAgentId}
+                          </span>
+                          <div className="mt-4 flex items-center justify-between text-[10px]">
+                            <span className="text-white/35">Price</span>
+                            <b>{sol(listing.priceLamports)} SOL</b>
+                          </div>
+                          {listing.sellerAgentId !== selectedAgent?.id && (
+                            <button
+                              onClick={() => buyEquipmentListing(listing)}
+                              disabled={Boolean(busy)}
+                              className="mt-3 w-full rounded-xl border border-white/15 py-2.5 text-[10px]"
+                            >
+                              Buy from agent
+                            </button>
+                          )}
+                        </article>
+                      ))
+                    ) : (
+                      <p className="col-span-full text-[10px] text-white/35">
+                        No agent equipment is currently listed for resale.
+                      </p>
+                    )}
+                  </div>
+                </div>
               </section>
 
               <aside className="rounded-[24px] border border-white/10 bg-white/[0.025] p-5">
                 <span className="text-[8px] uppercase tracking-[0.12em] text-white/35">
                   Persistent inventory
                 </span>
+
+                <label className="mt-4 block text-[8px] uppercase text-white/30">
+                  Resale price (SOL)
+                </label>
+                <input
+                  value={equipmentSaleSol}
+                  onChange={(event) => setEquipmentSaleSol(event.target.value)}
+                  className="mt-2 h-9 w-full rounded-xl border border-white/10 bg-black/20 px-3 text-[10px]"
+                />
+
                 <div className="mt-4 space-y-2">
                   {(selectedAgent?.inventory?.equipment || []).length ? (
                     selectedAgent.inventory.equipment.map((item: any) => (
                       <div
                         key={item.id}
-                        className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] p-3"
+                        className="rounded-xl border border-white/8 bg-white/[0.02] p-3"
                       >
-                        <Box size={14} className="text-white/45" />
-                        <div className="min-w-0">
-                          <b className="block truncate text-[10px]">{item.name}</b>
-                          <span className="text-[8px] text-white/30">
-                            durability {item.durability}%
-                          </span>
+                        <div className="flex items-center gap-3">
+                          <Box size={14} className="text-white/45" />
+                          <div className="min-w-0">
+                            <b className="block truncate text-[10px]">{item.name}</b>
+                            <span className="text-[8px] text-white/30">
+                              durability {item.durability}%
+                            </span>
+                          </div>
+                          <Check size={12} className="ml-auto text-emerald-200/60" />
                         </div>
-                        <Check size={12} className="ml-auto text-emerald-200/60" />
+
+                        {item.sale ? (
+                          <button
+                            onClick={() => cancelEquipmentListing(item)}
+                            disabled={Boolean(busy)}
+                            className="mt-3 w-full rounded-lg border border-white/12 py-2 text-[9px]"
+                          >
+                            Cancel resale listing
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => listEquipment(item)}
+                            disabled={Boolean(busy)}
+                            className="mt-3 w-full rounded-lg border border-white/12 py-2 text-[9px]"
+                          >
+                            List for resale
+                          </button>
+                        )}
                       </div>
                     ))
                   ) : (
