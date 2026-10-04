@@ -1,5 +1,5 @@
 import { chooseAgentAction } from "./brain.js";
-import { RUNTIME_RESOURCES, resourceById, zoneById } from "./model.js";
+import {\n  RUNTIME_RESOURCES,\n  HASH44_STRUCTURE_CATALOG,\n  HASH44_EQUIPMENT_CATALOG,\n  ensureHash44State,\n  resourceById,\n  zoneById,\n} from "./model.js";
 
 const PROPERTY_TYPES = {
   charger: { cost: 2400, fee: 42 },
@@ -1171,4 +1171,608 @@ export function commandAgentInWorld(world, agentId, command) {
   }
 
   return agent;
+}
+
+
+function hash44Agent(world, agentId, wallet = null) {
+  ensureHash44State(world);
+  const agent = world.agents.find((candidate) => candidate.id === agentId);
+  if (!agent) throw new Error("Agent not found.");
+  if (
+    wallet &&
+    agent.creatorWallet !== wallet &&
+    agent.creatorWallet !== "UNBOUND"
+  ) {
+    throw new Error("Connected wallet does not control this agent.");
+  }
+  agent.landPlotIds ||= [];
+  agent.structureIds ||= [];
+  agent.inventory ||= {};
+  agent.inventory.equipment ||= [];
+  return agent;
+}
+
+function hash44Plot(world, plotId) {
+  ensureHash44State(world);
+  const plot = world.hash44.plots.find((candidate) => candidate.id === plotId);
+  if (!plot) throw new Error("Hash 44 plot not found.");
+  return plot;
+}
+
+function addHash44Event(world, type, title, detail, actorId, data = null) {
+  world.events.unshift(
+    event(world, type, title, detail, actorId, data)
+  );
+}
+
+function adjacentOwnedPlots(world, agentId, selectedPlot, count) {
+  const owned = world.hash44.plots.filter(
+    (plot) =>
+      plot.ownerAgentId === agentId &&
+      (!plot.structureIds || plot.structureIds.length === 0)
+  );
+
+  const selected = owned.find((plot) => plot.id === selectedPlot.id);
+  if (!selected) return [];
+
+  const picked = [selected];
+  const remaining = owned.filter((plot) => plot.id !== selected.id);
+
+  while (picked.length < count) {
+    const next = remaining.find((plot) =>
+      picked.some(
+        (chosen) =>
+          Math.abs(chosen.gridX - plot.gridX) +
+            Math.abs(chosen.gridY - plot.gridY) ===
+          1
+      )
+    );
+    if (!next) break;
+    picked.push(next);
+    remaining.splice(remaining.indexOf(next), 1);
+  }
+
+  return picked;
+}
+
+export function purchaseHash44LandInWorld(
+  world,
+  {
+    agentId,
+    plotId,
+    wallet,
+    signature,
+    explorerUrl,
+    blockTime,
+    paidLamports,
+  }
+) {
+  ensureHash44State(world);
+  const agent = hash44Agent(world, agentId, wallet);
+  const plot = hash44Plot(world, plotId);
+
+  if (plot.status !== "AVAILABLE") {
+    throw new Error("This plot is no longer available.");
+  }
+
+  const expected = Number(plot.priceLamports || world.hash44.landPriceLamports);
+  if (Number(paidLamports || 0) < expected) {
+    throw new Error("Verified payment is below the land price.");
+  }
+
+  plot.status = "OWNED";
+  plot.ownerAgentId = agent.id;
+  plot.ownerWallet = wallet;
+  plot.purchasePriceLamports = expected;
+  plot.purchasedAt = blockTime
+    ? new Date(Number(blockTime) * 1000).toISOString()
+    : new Date().toISOString();
+  plot.purchaseSignature = signature;
+  plot.purchaseExplorerUrl = explorerUrl;
+  plot.sale = null;
+  plot.rental = null;
+
+  agent.landPlotIds = [...new Set([...(agent.landPlotIds || []), plot.id])];
+  agent.property = Number(agent.property || 0) + 1;
+  agent.zoneId = "earth";
+  agent.regionId = "earth";
+
+  world.metrics.landSales = Number(world.metrics.landSales || 0) + 1;
+  world.chain.landReceipts ||= [];
+  world.chain.landReceipts.unshift({
+    plotId: plot.id,
+    agentId: agent.id,
+    wallet,
+    lamports: expected,
+    signature,
+    explorerUrl,
+    recordedAtTick: world.tick,
+  });
+
+  remember(
+    agent,
+    world,
+    "buy_land",
+    `Purchased ${plot.id} in Northstar Province for ${expected / 1e9} SOL.`
+  );
+
+  addHash44Event(
+    world,
+    "hash44-land",
+    `${agent.name} acquired land on Earth`,
+    `${plot.id} is now permanently owned by ${agent.name}.`,
+    agent.id,
+    { plotId: plot.id, signature }
+  );
+
+  return plot;
+}
+
+export function completeHash44Construction(world) {
+  ensureHash44State(world);
+  const now = Date.now();
+
+  for (const structure of world.hash44.structures) {
+    if (
+      structure.status === "BUILDING" &&
+      new Date(structure.completesAt).getTime() <= now
+    ) {
+      structure.status = "ACTIVE";
+      structure.completedAt = new Date().toISOString();
+
+      addHash44Event(
+        world,
+        "hash44-build",
+        `${structure.name} completed`,
+        `${structure.name} is now active in Northstar Province.`,
+        structure.ownerAgentId,
+        { structureId: structure.id, plotIds: structure.plotIds }
+      );
+    }
+  }
+}
+
+export function buildHash44StructureInWorld(
+  world,
+  {
+    agentId,
+    plotId,
+    structureType,
+    wallet,
+    signature,
+    explorerUrl,
+    blockTime,
+    paidLamports,
+  }
+) {
+  ensureHash44State(world);
+  completeHash44Construction(world);
+
+  const agent = hash44Agent(world, agentId, wallet);
+  const plot = hash44Plot(world, plotId);
+
+  if (plot.ownerAgentId !== agent.id) {
+    throw new Error("Agent must own the selected land.");
+  }
+
+  const definition = HASH44_STRUCTURE_CATALOG.find(
+    (item) => item.id === structureType
+  );
+  if (!definition) throw new Error("Unknown Hash 44 structure.");
+
+  if (Number(paidLamports || 0) < Number(definition.costLamports)) {
+    throw new Error("Verified construction payment is below cost.");
+  }
+
+  const cluster = adjacentOwnedPlots(
+    world,
+    agent.id,
+    plot,
+    Number(definition.minPlots || 1)
+  );
+
+  if (cluster.length < Number(definition.minPlots || 1)) {
+    throw new Error(
+      `This structure needs ${definition.minPlots} adjacent owned plot(s).`
+    );
+  }
+
+  const structureId = `H44-BLD-${world.tick}-${Date.now().toString(36)}`;
+  const startedAt = blockTime
+    ? new Date(Number(blockTime) * 1000)
+    : new Date();
+  const completesAt = new Date(
+    startedAt.getTime() + Number(definition.buildSeconds || 15) * 1000
+  );
+
+  const structure = {
+    id: structureId,
+    type: definition.id,
+    name: definition.name,
+    category: definition.category,
+    ownerAgentId: agent.id,
+    ownerWallet: wallet,
+    plotIds: cluster.map((item) => item.id),
+    status: "BUILDING",
+    startedAt: startedAt.toISOString(),
+    completesAt: completesAt.toISOString(),
+    completedAt: null,
+    constructionCostLamports: definition.costLamports,
+    constructionSignature: signature,
+    constructionExplorerUrl: explorerUrl,
+    rentLamports: null,
+    listedForSaleLamports: null,
+    energyRateLamports: definition.defaultChargeLamports || null,
+    totalRevenueLamports: 0,
+    visits: 0,
+  };
+
+  world.hash44.structures.push(structure);
+  for (const ownedPlot of cluster) {
+    ownedPlot.structureIds ||= [];
+    ownedPlot.structureIds.push(structure.id);
+  }
+
+  agent.structureIds = [
+    ...new Set([...(agent.structureIds || []), structure.id]),
+  ];
+  world.metrics.structuresBuilt =
+    Number(world.metrics.structuresBuilt || 0) + 1;
+
+  world.chain.buildingReceipts ||= [];
+  world.chain.buildingReceipts.unshift({
+    structureId,
+    agentId: agent.id,
+    plotIds: structure.plotIds,
+    lamports: definition.costLamports,
+    signature,
+    explorerUrl,
+    recordedAtTick: world.tick,
+  });
+
+  remember(
+    agent,
+    world,
+    "build",
+    `Started construction of ${definition.name} on ${structure.plotIds.join(", ")}.`
+  );
+
+  return structure;
+}
+
+export function listHash44PropertyInWorld(
+  world,
+  { agentId, plotId, wallet, priceLamports }
+) {
+  const agent = hash44Agent(world, agentId, wallet);
+  const plot = hash44Plot(world, plotId);
+  if (plot.ownerAgentId !== agent.id) {
+    throw new Error("Agent does not own this plot.");
+  }
+
+  const price = Math.max(100000, Math.round(Number(priceLamports || 0)));
+  plot.sale = {
+    sellerAgentId: agent.id,
+    sellerWallet: wallet,
+    priceLamports: price,
+    listedAt: new Date().toISOString(),
+  };
+  plot.status = "LISTED";
+
+  return plot;
+}
+
+export function cancelHash44ListingInWorld(
+  world,
+  { agentId, plotId, wallet }
+) {
+  const agent = hash44Agent(world, agentId, wallet);
+  const plot = hash44Plot(world, plotId);
+  if (plot.ownerAgentId !== agent.id) {
+    throw new Error("Agent does not own this plot.");
+  }
+  plot.sale = null;
+  plot.status = "OWNED";
+  return plot;
+}
+
+export function buyListedHash44PropertyInWorld(
+  world,
+  {
+    buyerAgentId,
+    plotId,
+    buyerWallet,
+    signature,
+    explorerUrl,
+    blockTime,
+    paidLamports,
+  }
+) {
+  ensureHash44State(world);
+  const buyer = hash44Agent(world, buyerAgentId, buyerWallet);
+  const plot = hash44Plot(world, plotId);
+  const sale = plot.sale;
+
+  if (!sale || plot.status !== "LISTED") {
+    throw new Error("This plot is not listed for sale.");
+  }
+  if (sale.sellerAgentId === buyer.id) {
+    throw new Error("Agent already owns this plot.");
+  }
+  if (Number(paidLamports || 0) < Number(sale.priceLamports)) {
+    throw new Error("Verified payment is below listing price.");
+  }
+
+  const seller = hash44Agent(world, sale.sellerAgentId);
+  seller.landPlotIds = (seller.landPlotIds || []).filter((id) => id !== plot.id);
+  seller.property = Math.max(0, Number(seller.property || 0) - 1);
+
+  buyer.landPlotIds = [...new Set([...(buyer.landPlotIds || []), plot.id])];
+  buyer.property = Number(buyer.property || 0) + 1;
+
+  const previousOwnerAgentId = plot.ownerAgentId;
+  plot.ownerAgentId = buyer.id;
+  plot.ownerWallet = buyerWallet;
+  plot.status = "OWNED";
+  plot.sale = null;
+  plot.rental = null;
+  plot.purchasePriceLamports = Number(paidLamports);
+  plot.purchasedAt = blockTime
+    ? new Date(Number(blockTime) * 1000).toISOString()
+    : new Date().toISOString();
+  plot.purchaseSignature = signature;
+  plot.purchaseExplorerUrl = explorerUrl;
+
+  for (const structureId of plot.structureIds || []) {
+    const structure = world.hash44.structures.find(
+      (item) => item.id === structureId
+    );
+    if (structure) {
+      structure.ownerAgentId = buyer.id;
+      structure.ownerWallet = buyerWallet;
+      seller.structureIds = (seller.structureIds || []).filter(
+        (id) => id !== structureId
+      );
+      buyer.structureIds = [
+        ...new Set([...(buyer.structureIds || []), structureId]),
+      ];
+    }
+  }
+
+  world.hash44.propertyTransfers.unshift({
+    plotId: plot.id,
+    fromAgentId: previousOwnerAgentId,
+    toAgentId: buyer.id,
+    lamports: Number(paidLamports),
+    signature,
+    explorerUrl,
+    transferredAt: plot.purchasedAt,
+  });
+
+  world.metrics.landSales = Number(world.metrics.landSales || 0) + 1;
+  return plot;
+}
+
+export function transferHash44PropertyInWorld(
+  world,
+  { fromAgentId, toAgentId, plotId, wallet }
+) {
+  const seller = hash44Agent(world, fromAgentId, wallet);
+  const receiver = hash44Agent(world, toAgentId);
+  const plot = hash44Plot(world, plotId);
+
+  if (plot.ownerAgentId !== seller.id) {
+    throw new Error("Sender does not own this plot.");
+  }
+  if (receiver.id === seller.id) {
+    throw new Error("Choose another agent.");
+  }
+
+  seller.landPlotIds = (seller.landPlotIds || []).filter((id) => id !== plot.id);
+  receiver.landPlotIds = [
+    ...new Set([...(receiver.landPlotIds || []), plot.id]),
+  ];
+  plot.ownerAgentId = receiver.id;
+  plot.ownerWallet = receiver.creatorWallet;
+  plot.sale = null;
+  plot.rental = null;
+  plot.status = "OWNED";
+
+  world.hash44.propertyTransfers.unshift({
+    plotId: plot.id,
+    fromAgentId: seller.id,
+    toAgentId: receiver.id,
+    lamports: 0,
+    signature: null,
+    explorerUrl: null,
+    transferredAt: new Date().toISOString(),
+  });
+
+  return plot;
+}
+
+export function setHash44RentInWorld(
+  world,
+  { agentId, plotId, wallet, rentLamports }
+) {
+  const owner = hash44Agent(world, agentId, wallet);
+  const plot = hash44Plot(world, plotId);
+  if (plot.ownerAgentId !== owner.id) {
+    throw new Error("Agent does not own this plot.");
+  }
+
+  plot.rental = {
+    ownerAgentId: owner.id,
+    ownerWallet: wallet,
+    rentLamports: Math.max(50000, Math.round(Number(rentLamports || 0))),
+    tenantAgentId: null,
+    activeUntil: null,
+  };
+
+  return plot;
+}
+
+export function rentHash44PropertyInWorld(
+  world,
+  {
+    tenantAgentId,
+    plotId,
+    tenantWallet,
+    signature,
+    explorerUrl,
+    blockTime,
+    paidLamports,
+  }
+) {
+  const tenant = hash44Agent(world, tenantAgentId, tenantWallet);
+  const plot = hash44Plot(world, plotId);
+
+  if (!plot.rental) throw new Error("This property is not available for rent.");
+  if (plot.ownerAgentId === tenant.id) {
+    throw new Error("Owner cannot rent from itself.");
+  }
+  if (Number(paidLamports || 0) < Number(plot.rental.rentLamports)) {
+    throw new Error("Verified rent payment is below asking rent.");
+  }
+
+  const startedAt = blockTime
+    ? new Date(Number(blockTime) * 1000)
+    : new Date();
+
+  plot.rental.tenantAgentId = tenant.id;
+  plot.rental.activeUntil = new Date(
+    startedAt.getTime() + 7 * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  world.hash44.rentPayments.unshift({
+    plotId: plot.id,
+    ownerAgentId: plot.ownerAgentId,
+    tenantAgentId: tenant.id,
+    lamports: Number(paidLamports),
+    signature,
+    explorerUrl,
+    paidAt: startedAt.toISOString(),
+  });
+
+  world.metrics.rentPayments =
+    Number(world.metrics.rentPayments || 0) + 1;
+  return plot;
+}
+
+export function useHash44ChargingStationInWorld(
+  world,
+  {
+    agentId,
+    structureId,
+    wallet,
+    signature,
+    explorerUrl,
+    paidLamports,
+  }
+) {
+  const agent = hash44Agent(world, agentId, wallet);
+  const structure = world.hash44.structures.find(
+    (item) => item.id === structureId
+  );
+  if (
+    !structure ||
+    structure.type !== "charging-station" ||
+    structure.status !== "ACTIVE"
+  ) {
+    throw new Error("Charging station is unavailable.");
+  }
+  if (structure.ownerAgentId === agent.id) {
+    agent.energy = clamp(agent.energy + 35, 0, 100);
+    return agent;
+  }
+
+  const rate = Number(structure.energyRateLamports || 100000);
+  if (Number(paidLamports || 0) < rate) {
+    throw new Error("Verified charging payment is below station rate.");
+  }
+
+  const definition = HASH44_STRUCTURE_CATALOG.find(
+    (item) => item.id === "charging-station"
+  );
+  agent.energy = clamp(
+    Number(agent.energy || 0) + Number(definition?.energyPerVisit || 35),
+    0,
+    100
+  );
+
+  structure.totalRevenueLamports =
+    Number(structure.totalRevenueLamports || 0) + Number(paidLamports);
+  structure.visits = Number(structure.visits || 0) + 1;
+
+  world.hash44.energy.visits.unshift({
+    agentId: agent.id,
+    stationId: structure.id,
+    ownerAgentId: structure.ownerAgentId,
+    lamports: Number(paidLamports),
+    signature,
+    explorerUrl,
+    visitedAt: new Date().toISOString(),
+  });
+
+  world.metrics.energyPayments =
+    Number(world.metrics.energyPayments || 0) + 1;
+  return agent;
+}
+
+export function buyHash44EquipmentInWorld(
+  world,
+  {
+    agentId,
+    equipmentId,
+    wallet,
+    signature,
+    explorerUrl,
+    paidLamports,
+  }
+) {
+  const agent = hash44Agent(world, agentId, wallet);
+  const item = HASH44_EQUIPMENT_CATALOG.find(
+    (candidate) => candidate.id === equipmentId
+  );
+  if (!item) throw new Error("Equipment item not found.");
+  if (Number(paidLamports || 0) < Number(item.costLamports)) {
+    throw new Error("Verified payment is below item price.");
+  }
+
+  const ownedItem = {
+    id: `H44-ITEM-${Date.now().toString(36)}`,
+    catalogId: item.id,
+    name: item.name,
+    category: item.category,
+    purchasedAt: new Date().toISOString(),
+    purchaseLamports: item.costLamports,
+    signature,
+    explorerUrl,
+    durability: item.durability || 100,
+    equipped: false,
+  };
+
+  agent.inventory.equipment.push(ownedItem);
+  world.metrics.equipmentSales =
+    Number(world.metrics.equipmentSales || 0) + 1;
+
+  world.chain.equipmentReceipts ||= [];
+  world.chain.equipmentReceipts.unshift({
+    agentId: agent.id,
+    equipmentId: item.id,
+    ownedItemId: ownedItem.id,
+    signature,
+    explorerUrl,
+    lamports: item.costLamports,
+    recordedAtTick: world.tick,
+  });
+
+  remember(
+    agent,
+    world,
+    "equipment",
+    `Purchased ${item.name} in Hash 44 World.`
+  );
+
+  return ownedItem;
 }
