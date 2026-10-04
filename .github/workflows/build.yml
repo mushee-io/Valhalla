@@ -15,4 +15,5 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run build
-      - run: npm run runtime:smoke\n      - run: npm run api:smoke
+      - run: npm run runtime:smoke
+      - run: npm run api:smoke
