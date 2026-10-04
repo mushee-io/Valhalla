@@ -25,17 +25,24 @@ import {
 import DeployModal from "./ui/DeployModal";
 import Landing from "./ui/Landing";
 import PortalUniverse from "./ui/PortalUniverse";
+import { ensureHash44State } from "../server/runtime/model.js";
 
 const STORAGE_KEY = "valhalla-world-v10";
 
 function freshWorld() {
-  return ensureCivilizationState(createInitialWorld());
+  return ensureHash44State(
+    ensureCivilizationState(createInitialWorld())
+  );
 }
 
 function loadWorld() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? ensureCivilizationState(migrateWorld(JSON.parse(raw))) : freshWorld();
+    return raw
+      ? ensureHash44State(
+          ensureCivilizationState(migrateWorld(JSON.parse(raw)))
+        )
+      : freshWorld();
   } catch {
     return freshWorld();
   }
@@ -56,7 +63,8 @@ function mergeRemoteWorld(current, remote) {
       ? current.selectedRegion
       : selected?.regionId || selected?.zoneId || "genesis-port";
 
-  return ensureCivilizationState({
+  return ensureHash44State(
+    ensureCivilizationState({
     ...remote,
     selectedAgent,
     selectedRegion: candidateRegion,
@@ -68,7 +76,8 @@ function mergeRemoteWorld(current, remote) {
       remote?.metrics?.totalVolume ??
       current?.totalVolume ??
       0,
-  });
+    })
+  );
 }
 
 export default function App() {
@@ -148,8 +157,10 @@ export default function App() {
       const delay = world.civilizationMode ? 2400 : 1800;
       const timer = window.setInterval(() => {
         setWorld((current) =>
-          advanceCivilization(
-            advanceWorld(ensureCivilizationState(current))
+          ensureHash44State(
+            advanceCivilization(
+              advanceWorld(ensureCivilizationState(current))
+            )
           )
         );
       }, delay);
@@ -234,7 +245,11 @@ export default function App() {
         }
       } else {
         setWorld((current) =>
-          ensureCivilizationState(deployAgent(current, form, identity))
+          ensureHash44State(
+            ensureCivilizationState(
+              deployAgent(current, form, identity)
+            )
+          )
         );
       }
 
