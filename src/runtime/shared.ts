@@ -203,3 +203,88 @@ export async function hash44BuyEquipmentListing(payload: any) {
     body: JSON.stringify({ op: "hash44_buy_equipment_listing", ...payload }),
   });
 }
+
+
+export async function hash44BuildBusiness(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_build_business", ...payload }),
+  });
+}
+
+export async function hash44UseBusiness(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_use_business", ...payload }),
+  });
+}
+
+export async function hash44BuildGpu(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_build_gpu", ...payload }),
+  });
+}
+
+export async function hash44UseGpu(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_use_gpu", ...payload }),
+  });
+}
+
+export async function hash44BuildRepair(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_build_repair", ...payload }),
+  });
+}
+
+export async function hash44UseRepair(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_use_repair", ...payload }),
+  });
+}
+
+export async function hash44BuyVehicle(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_buy_vehicle", ...payload }),
+  });
+}
+
+export async function hash44CreateRoute(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_create_route", ...payload }),
+  });
+}
+
+export async function hash44UseRoute(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_use_route", ...payload }),
+  });
+}
+
+export async function hash44InvestBusiness(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_invest_business", ...payload }),
+  });
+}
+
+export async function hash44Borrow(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_borrow", ...payload }),
+  });
+}
+
+export async function hash44RepayLoan(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_repay_loan", ...payload }),
+  });
+}
