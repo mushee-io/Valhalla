@@ -181,3 +181,25 @@ export async function hash44BuyEquipment(payload: any) {
     body: JSON.stringify({ op: "hash44_buy_equipment", ...payload }),
   });
 }
+
+
+export async function hash44ListEquipment(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_list_equipment", ...payload }),
+  });
+}
+
+export async function hash44CancelEquipmentListing(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_cancel_equipment_listing", ...payload }),
+  });
+}
+
+export async function hash44BuyEquipmentListing(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_buy_equipment_listing", ...payload }),
+  });
+}
