@@ -189,6 +189,7 @@ export function createHash44State() {
     propertyTransfers: [],
     rentPayments: [],
     equipmentCatalog: HASH44_EQUIPMENT_CATALOG,
+    equipmentMarket: [],
     structureCatalog: HASH44_STRUCTURE_CATALOG,
     energy: {
       rechargeBaseLamports: 100000,
@@ -216,6 +217,7 @@ export function ensureHash44State(world) {
   }
   world.hash44.structureCatalog = HASH44_STRUCTURE_CATALOG;
   world.hash44.equipmentCatalog = HASH44_EQUIPMENT_CATALOG;
+  world.hash44.equipmentMarket ||= [];
   world.hash44.structures ||= [];
   world.hash44.propertyTransfers ||= [];
   world.hash44.rentPayments ||= [];
