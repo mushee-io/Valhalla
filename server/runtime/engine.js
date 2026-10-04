@@ -3,6 +3,10 @@ import {
   RUNTIME_RESOURCES,
   HASH44_STRUCTURE_CATALOG,
   HASH44_EQUIPMENT_CATALOG,
+  HASH44_BUSINESS_CATALOG,
+  HASH44_GPU_CATALOG,
+  HASH44_REPAIR_CATALOG,
+  HASH44_VEHICLE_CATALOG,
   ensureHash44State,
   resourceById,
   zoneById,
@@ -1913,4 +1917,569 @@ export function buyListedHash44EquipmentInWorld(
   );
 
   return item;
+}
+
+
+function hash44FreePlotsForFacility(world, agentId, plotId, minPlots) {
+  const start = hash44Plot(world, plotId);
+  if (start.ownerAgentId !== agentId) {
+    throw new Error("Agent must own the selected land.");
+  }
+  const cluster = adjacentOwnedPlots(world, agentId, start, Number(minPlots || 1));
+  if (cluster.length < Number(minPlots || 1)) {
+    throw new Error(`This facility needs ${minPlots} adjacent owned plots.`);
+  }
+  return cluster;
+}
+
+function chargeCredits(agent, amount, label = "purchase") {
+  const value = Math.max(0, Math.round(Number(amount || 0)));
+  if (Number(agent.wealth || 0) < value) {
+    throw new Error(`Insufficient agent treasury for ${label}.`);
+  }
+  agent.wealth -= value;
+  return value;
+}
+
+function creditAgent(world, agentId, amount) {
+  const agent = world.agents.find((candidate) => candidate.id === agentId);
+  if (agent) agent.wealth = Number(agent.wealth || 0) + Number(amount || 0);
+  return agent;
+}
+
+function reservePlotsForAsset(cluster, assetId) {
+  for (const plot of cluster) {
+    plot.structureIds ||= [];
+    if (!plot.structureIds.includes(assetId)) plot.structureIds.push(assetId);
+  }
+}
+
+export function buildHash44BusinessInWorld(
+  world,
+  { agentId, plotId, businessType, wallet }
+) {
+  ensureHash44State(world);
+  const agent = hash44Agent(world, agentId, wallet);
+  const definition = HASH44_BUSINESS_CATALOG.find(
+    (item) => item.id === businessType
+  );
+  if (!definition) throw new Error("Unknown commercial building.");
+
+  const cluster = hash44FreePlotsForFacility(
+    world,
+    agent.id,
+    plotId,
+    definition.minPlots
+  );
+
+  chargeCredits(agent, definition.costCredits, definition.name);
+
+  const business = {
+    id: `H44-BIZ-${Date.now().toString(36)}`,
+    type: definition.id,
+    name: definition.name,
+    ownerAgentId: agent.id,
+    plotIds: cluster.map((plot) => plot.id),
+    status: "ACTIVE",
+    serviceFeeCredits: definition.serviceFeeCredits,
+    capacity: definition.capacity,
+    customers: 0,
+    revenueCredits: 0,
+    valuationCredits: Math.round(definition.costCredits * 1.25),
+    totalShares: 1000,
+    treasuryShares: 700,
+    ownerShares: 300,
+    createdAt: new Date().toISOString(),
+  };
+
+  world.hash44.businesses.push(business);
+  reservePlotsForAsset(cluster, business.id);
+  agent.businessIds = [...new Set([...(agent.businessIds || []), business.id])];
+  world.metrics.businessesBuilt = Number(world.metrics.businessesBuilt || 0) + 1;
+
+  remember(
+    agent,
+    world,
+    "build_business",
+    `Opened ${business.name} on ${business.plotIds.join(", ")} for ${definition.costCredits} credits.`
+  );
+  addHash44Event(
+    world,
+    "hash44-business",
+    `${agent.name} opened ${business.name}`,
+    "A new commercial property is now active in Northstar Province.",
+    agent.id,
+    { businessId: business.id }
+  );
+
+  return business;
+}
+
+export function useHash44BusinessInWorld(
+  world,
+  { agentId, businessId, wallet }
+) {
+  ensureHash44State(world);
+  const customer = hash44Agent(world, agentId, wallet);
+  const business = world.hash44.businesses.find((item) => item.id === businessId);
+  if (!business || business.status !== "ACTIVE") {
+    throw new Error("Business is unavailable.");
+  }
+  if (business.ownerAgentId === customer.id) return business;
+
+  const fee = chargeCredits(customer, business.serviceFeeCredits, "business service");
+  creditAgent(world, business.ownerAgentId, fee);
+  business.customers = Number(business.customers || 0) + 1;
+  business.revenueCredits = Number(business.revenueCredits || 0) + fee;
+  business.valuationCredits = Math.round(
+    Number(business.valuationCredits || 0) + fee * 0.18
+  );
+
+  world.hash44.serviceTransactions.unshift({
+    id: id("h44-service", world, customer.id),
+    type: "commercial",
+    providerId: business.ownerAgentId,
+    customerId: customer.id,
+    assetId: business.id,
+    credits: fee,
+    createdAt: new Date().toISOString(),
+  });
+
+  return business;
+}
+
+export function buildHash44GpuCentreInWorld(
+  world,
+  { agentId, plotId, centreType, wallet }
+) {
+  ensureHash44State(world);
+  const agent = hash44Agent(world, agentId, wallet);
+  const definition = HASH44_GPU_CATALOG.find((item) => item.id === centreType);
+  if (!definition) throw new Error("Unknown GPU centre.");
+
+  const cluster = hash44FreePlotsForFacility(
+    world,
+    agent.id,
+    plotId,
+    definition.minPlots
+  );
+
+  chargeCredits(agent, definition.costCredits, definition.name);
+
+  const centre = {
+    id: `H44-GPU-${Date.now().toString(36)}`,
+    type: definition.id,
+    name: definition.name,
+    ownerAgentId: agent.id,
+    plotIds: cluster.map((plot) => plot.id),
+    status: "ACTIVE",
+    computeCapacity: definition.computeCapacity,
+    computeAvailable: definition.computeCapacity,
+    computePerVisit: definition.computePerVisit,
+    serviceFeeCredits: definition.serviceFeeCredits,
+    energyDraw: definition.energyDraw,
+    sessions: 0,
+    revenueCredits: 0,
+    createdAt: new Date().toISOString(),
+  };
+
+  world.hash44.computeCentres.push(centre);
+  reservePlotsForAsset(cluster, centre.id);
+  agent.businessIds = [...new Set([...(agent.businessIds || []), centre.id])];
+  world.metrics.businessesBuilt = Number(world.metrics.businessesBuilt || 0) + 1;
+
+  remember(
+    agent,
+    world,
+    "gpu_centre",
+    `Built ${centre.name} with ${centre.computeCapacity} compute capacity.`
+  );
+
+  return centre;
+}
+
+export function useHash44GpuCentreInWorld(
+  world,
+  { agentId, centreId, wallet }
+) {
+  ensureHash44State(world);
+  const customer = hash44Agent(world, agentId, wallet);
+  const centre = world.hash44.computeCentres.find((item) => item.id === centreId);
+
+  if (!centre || centre.status !== "ACTIVE") {
+    throw new Error("GPU centre is unavailable.");
+  }
+  if (Number(centre.computeAvailable || 0) < Number(centre.computePerVisit || 0)) {
+    throw new Error("GPU centre has no compute capacity available.");
+  }
+
+  if (centre.ownerAgentId !== customer.id) {
+    const fee = chargeCredits(customer, centre.serviceFeeCredits, "compute");
+    creditAgent(world, centre.ownerAgentId, fee);
+    centre.revenueCredits = Number(centre.revenueCredits || 0) + fee;
+  }
+
+  centre.computeAvailable -= centre.computePerVisit;
+  centre.sessions = Number(centre.sessions || 0) + 1;
+  customer.compute = clamp(
+    Number(customer.compute || 0) + Number(centre.computePerVisit || 0),
+    0,
+    100
+  );
+
+  world.metrics.computeSessions = Number(world.metrics.computeSessions || 0) + 1;
+  world.hash44.serviceTransactions.unshift({
+    id: id("h44-compute", world, customer.id),
+    type: "compute",
+    providerId: centre.ownerAgentId,
+    customerId: customer.id,
+    assetId: centre.id,
+    credits: centre.ownerAgentId === customer.id ? 0 : centre.serviceFeeCredits,
+    createdAt: new Date().toISOString(),
+  });
+
+  return centre;
+}
+
+export function buildHash44RepairCentreInWorld(
+  world,
+  { agentId, plotId, centreType, wallet }
+) {
+  ensureHash44State(world);
+  const agent = hash44Agent(world, agentId, wallet);
+  const definition = HASH44_REPAIR_CATALOG.find((item) => item.id === centreType);
+  if (!definition) throw new Error("Unknown repair facility.");
+
+  const cluster = hash44FreePlotsForFacility(
+    world,
+    agent.id,
+    plotId,
+    definition.minPlots
+  );
+  chargeCredits(agent, definition.costCredits, definition.name);
+
+  const centre = {
+    id: `H44-REPAIR-${Date.now().toString(36)}`,
+    type: definition.id,
+    name: definition.name,
+    ownerAgentId: agent.id,
+    plotIds: cluster.map((plot) => plot.id),
+    status: "ACTIVE",
+    repairPerVisit: definition.repairPerVisit,
+    serviceFeeCredits: definition.serviceFeeCredits,
+    patients: 0,
+    revenueCredits: 0,
+    createdAt: new Date().toISOString(),
+  };
+
+  world.hash44.repairCentres.push(centre);
+  reservePlotsForAsset(cluster, centre.id);
+  agent.businessIds = [...new Set([...(agent.businessIds || []), centre.id])];
+
+  return centre;
+}
+
+export function useHash44RepairCentreInWorld(
+  world,
+  { agentId, centreId, wallet }
+) {
+  ensureHash44State(world);
+  const patient = hash44Agent(world, agentId, wallet);
+  const centre = world.hash44.repairCentres.find((item) => item.id === centreId);
+
+  if (!centre || centre.status !== "ACTIVE") {
+    throw new Error("Repair facility is unavailable.");
+  }
+
+  if (centre.ownerAgentId !== patient.id) {
+    const fee = chargeCredits(patient, centre.serviceFeeCredits, "repair");
+    creditAgent(world, centre.ownerAgentId, fee);
+    centre.revenueCredits = Number(centre.revenueCredits || 0) + fee;
+  }
+
+  patient.durability = clamp(
+    Number(patient.durability || 0) + Number(centre.repairPerVisit || 0),
+    0,
+    100
+  );
+  patient.compute = clamp(Number(patient.compute || 0) + 5, 0, 100);
+  centre.patients = Number(centre.patients || 0) + 1;
+  world.metrics.repairSessions = Number(world.metrics.repairSessions || 0) + 1;
+
+  return centre;
+}
+
+export function buyHash44VehicleInWorld(
+  world,
+  { agentId, vehicleType, wallet }
+) {
+  ensureHash44State(world);
+  const agent = hash44Agent(world, agentId, wallet);
+  const definition = HASH44_VEHICLE_CATALOG.find(
+    (item) => item.id === vehicleType
+  );
+  if (!definition) throw new Error("Unknown vehicle.");
+
+  chargeCredits(agent, definition.costCredits, definition.name);
+
+  const vehicle = {
+    id: `H44-VEH-${Date.now().toString(36)}`,
+    type: definition.id,
+    name: definition.name,
+    ownerAgentId: agent.id,
+    speed: definition.speed,
+    capacity: definition.capacity,
+    energyCost: definition.energyCost,
+    durability: 100,
+    status: "PARKED",
+    locationPlotId: agent.landPlotIds?.[0] || null,
+    createdAt: new Date().toISOString(),
+  };
+
+  world.hash44.vehicles.push(vehicle);
+  agent.vehicleIds = [...new Set([...(agent.vehicleIds || []), vehicle.id])];
+  world.metrics.vehiclesSold = Number(world.metrics.vehiclesSold || 0) + 1;
+
+  return vehicle;
+}
+
+export function createHash44TransportRouteInWorld(
+  world,
+  { agentId, vehicleId, fromPlotId, toPlotId, wallet, fareCredits }
+) {
+  ensureHash44State(world);
+  const agent = hash44Agent(world, agentId, wallet);
+  const vehicle = world.hash44.vehicles.find(
+    (item) => item.id === vehicleId && item.ownerAgentId === agent.id
+  );
+  if (!vehicle) throw new Error("Agent does not own this vehicle.");
+
+  hash44Plot(world, fromPlotId);
+  hash44Plot(world, toPlotId);
+  if (fromPlotId === toPlotId) throw new Error("Route requires two different plots.");
+
+  const route = {
+    id: `H44-ROUTE-${Date.now().toString(36)}`,
+    ownerAgentId: agent.id,
+    vehicleId: vehicle.id,
+    fromPlotId,
+    toPlotId,
+    fareCredits: Math.max(10, Math.round(Number(fareCredits || 50))),
+    trips: 0,
+    revenueCredits: 0,
+    status: "ACTIVE",
+    createdAt: new Date().toISOString(),
+  };
+
+  vehicle.status = "ROUTE";
+  world.hash44.transportRoutes.push(route);
+  return route;
+}
+
+export function useHash44TransportRouteInWorld(
+  world,
+  { agentId, routeId, wallet }
+) {
+  ensureHash44State(world);
+  const passenger = hash44Agent(world, agentId, wallet);
+  const route = world.hash44.transportRoutes.find((item) => item.id === routeId);
+
+  if (!route || route.status !== "ACTIVE") {
+    throw new Error("Transport route is unavailable.");
+  }
+
+  const vehicle = world.hash44.vehicles.find((item) => item.id === route.vehicleId);
+  if (!vehicle) throw new Error("Route vehicle is missing.");
+
+  if (route.ownerAgentId !== passenger.id) {
+    const fare = chargeCredits(passenger, route.fareCredits, "transport fare");
+    creditAgent(world, route.ownerAgentId, fare);
+    route.revenueCredits = Number(route.revenueCredits || 0) + fare;
+  }
+
+  passenger.energy = clamp(
+    Number(passenger.energy || 0) - Number(vehicle.energyCost || 1),
+    0,
+    100
+  );
+  passenger.zoneId = "earth";
+  passenger.regionId = "earth";
+  passenger.lastTransport = {
+    routeId: route.id,
+    fromPlotId: route.fromPlotId,
+    toPlotId: route.toPlotId,
+    at: new Date().toISOString(),
+  };
+
+  route.trips = Number(route.trips || 0) + 1;
+  world.metrics.transportTrips = Number(world.metrics.transportTrips || 0) + 1;
+  return route;
+}
+
+function businessSharePrice(business) {
+  return Math.max(
+    1,
+    Math.round(Number(business.valuationCredits || 1000) / Number(business.totalShares || 1000))
+  );
+}
+
+export function investHash44BusinessInWorld(
+  world,
+  { agentId, businessId, shares, wallet }
+) {
+  ensureHash44State(world);
+  const investor = hash44Agent(world, agentId, wallet);
+  const business = world.hash44.businesses.find((item) => item.id === businessId);
+  if (!business) throw new Error("Business not found.");
+
+  const quantity = clamp(Math.floor(Number(shares || 1)), 1, 100);
+  if (Number(business.treasuryShares || 0) < quantity) {
+    throw new Error("Not enough shares are available.");
+  }
+
+  const pricePerShare = businessSharePrice(business);
+  const total = pricePerShare * quantity;
+  chargeCredits(investor, total, "investment");
+
+  const owner = creditAgent(world, business.ownerAgentId, total);
+  business.treasuryShares -= quantity;
+  business.valuationCredits = Math.round(
+    Number(business.valuationCredits || 0) + total * 0.08
+  );
+
+  let holding = world.hash44.finance.shareHoldings.find(
+    (item) => item.agentId === investor.id && item.businessId === business.id
+  );
+  if (!holding) {
+    holding = {
+      id: `H44-SHARE-${Date.now().toString(36)}`,
+      agentId: investor.id,
+      businessId: business.id,
+      shares: 0,
+      averageCostCredits: 0,
+      investedCredits: 0,
+    };
+    world.hash44.finance.shareHoldings.push(holding);
+  }
+
+  holding.investedCredits += total;
+  holding.shares += quantity;
+  holding.averageCostCredits = Math.round(
+    holding.investedCredits / Math.max(1, holding.shares)
+  );
+
+  investor.shareHoldings = [
+    ...new Set([...(investor.shareHoldings || []), holding.id]),
+  ];
+
+  world.hash44.finance.investmentTransactions.unshift({
+    id: id("h44-invest", world, investor.id),
+    investorAgentId: investor.id,
+    businessId: business.id,
+    shares: quantity,
+    credits: total,
+    pricePerShare,
+    createdAt: new Date().toISOString(),
+  });
+
+  world.metrics.investments = Number(world.metrics.investments || 0) + 1;
+  return holding;
+}
+
+export function borrowHash44CreditsInWorld(
+  world,
+  { agentId, amountCredits, wallet }
+) {
+  ensureHash44State(world);
+  const borrower = hash44Agent(world, agentId, wallet);
+  const pool = world.hash44.finance.pool;
+  const amount = clamp(Math.round(Number(amountCredits || 0)), 100, 25000);
+
+  const assetValue =
+    (borrower.landPlotIds || []).length * 2500 +
+    (borrower.businessIds || []).length * 5000 +
+    (borrower.vehicleIds || []).length * 1500 +
+    Number(borrower.wealth || 0);
+
+  const existingDebt = world.hash44.finance.loans
+    .filter((loan) => loan.borrowerAgentId === borrower.id && loan.status === "ACTIVE")
+    .reduce((sum, loan) => sum + Number(loan.balanceCredits || 0), 0);
+
+  const maxBorrow = Math.max(500, Math.round(assetValue * 0.4) - existingDebt);
+  if (amount > maxBorrow) {
+    throw new Error(`Borrow limit is ${maxBorrow} credits based on agent assets.`);
+  }
+  if (Number(pool.liquidityCredits || 0) < amount) {
+    throw new Error("Hash 44 credit pool has insufficient liquidity.");
+  }
+
+  const rate = Number(pool.baseInterestRate || 0.08);
+  const loan = {
+    id: `H44-LOAN-${Date.now().toString(36)}`,
+    borrowerAgentId: borrower.id,
+    principalCredits: amount,
+    interestRate: rate,
+    balanceCredits: Math.round(amount * (1 + rate)),
+    status: "ACTIVE",
+    issuedAt: new Date().toISOString(),
+    repaidAt: null,
+  };
+
+  pool.liquidityCredits -= amount;
+  pool.totalBorrowed = Number(pool.totalBorrowed || 0) + amount;
+  borrower.wealth += amount;
+  borrower.loanIds = [...new Set([...(borrower.loanIds || []), loan.id])];
+  world.hash44.finance.loans.push(loan);
+  world.metrics.loansIssued = Number(world.metrics.loansIssued || 0) + 1;
+
+  return loan;
+}
+
+export function repayHash44LoanInWorld(
+  world,
+  { agentId, loanId, wallet }
+) {
+  ensureHash44State(world);
+  const borrower = hash44Agent(world, agentId, wallet);
+  const loan = world.hash44.finance.loans.find(
+    (item) => item.id === loanId && item.borrowerAgentId === borrower.id
+  );
+  if (!loan || loan.status !== "ACTIVE") throw new Error("Active loan not found.");
+
+  const amount = Number(loan.balanceCredits || 0);
+  chargeCredits(borrower, amount, "loan repayment");
+
+  const pool = world.hash44.finance.pool;
+  pool.liquidityCredits += amount;
+  pool.totalRepaid = Number(pool.totalRepaid || 0) + amount;
+  loan.balanceCredits = 0;
+  loan.status = "REPAID";
+  loan.repaidAt = new Date().toISOString();
+
+  return loan;
+}
+
+function hash44EconomyTick(world) {
+  ensureHash44State(world);
+
+  for (const centre of world.hash44.computeCentres) {
+    if (centre.status !== "ACTIVE") continue;
+    centre.computeAvailable = Math.min(
+      Number(centre.computeCapacity || 0),
+      Number(centre.computeAvailable || 0) + Math.max(4, Math.round(Number(centre.computeCapacity || 0) * 0.08))
+    );
+  }
+
+  if (world.tick % 6 === 0) {
+    for (const business of world.hash44.businesses) {
+      if (business.status !== "ACTIVE") continue;
+      business.valuationCredits = Math.max(
+        1000,
+        Math.round(
+          Number(business.valuationCredits || 0) *
+            (1 + Math.min(0.02, Number(business.revenueCredits || 0) / 500000))
+        )
+      );
+    }
+  }
 }
