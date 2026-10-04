@@ -25,7 +25,9 @@ import {
   hash44CancelListing,
   hash44Charge,
   hash44ListProperty,
+  hash44Rent,
   hash44SetRent,
+  hash44TransferProperty,
 } from "../runtime/shared";
 import {
   sendHash44Payment,
@@ -63,6 +65,7 @@ export default function Hash44World({
   const [error, setError] = useState("");
   const [saleSol, setSaleSol] = useState("0.0010");
   const [rentSol, setRentSol] = useState("0.0002");
+  const [transferTarget, setTransferTarget] = useState("");
 
   const hash44 = world.hash44;
   const plots = hash44?.plots || [];
@@ -99,6 +102,16 @@ export default function Hash44World({
   const listedPlots = useMemo(
     () => plots.filter((plot: any) => plot.status === "LISTED" && plot.sale),
     [plots]
+  );
+
+  const rentablePlots = useMemo(
+    () =>
+      plots.filter(
+        (plot: any) =>
+          plot.rental &&
+          plot.ownerAgentId !== selectedAgent?.id
+      ),
+    [plots, selectedAgent?.id]
   );
 
   const chargingStations = useMemo(
@@ -270,6 +283,51 @@ export default function Hash44World({
         proof,
       });
     });
+
+
+  const rentListedPlot = (plot: any) =>
+    run("rent-property", async () => {
+      const address = await ensureWallet();
+      ensureAgentControl(address);
+      const payment = await sendHash44Payment(
+        window.solana,
+        address,
+        plot.rental.ownerWallet,
+        Number(plot.rental.rentLamports),
+        `HASH44 RENT|${selectedAgent.id}|${plot.id}`
+      );
+      return hash44Rent({
+        agentId: selectedAgent.id,
+        plotId: plot.id,
+        wallet: address,
+        signature: payment.signature,
+      });
+    });
+
+  const transferProperty = () =>
+    run("transfer-property", async () => {
+      const address = await ensureWallet();
+      ensureAgentControl(address);
+      if (!transferTarget) throw new Error("Choose a receiving agent.");
+      const proof = await signHash44Action(
+        window.solana,
+        address,
+        "transfer_property",
+        {
+          agentId: selectedAgent.id,
+          toAgentId: transferTarget,
+          plotId: selectedPlot.id,
+        }
+      );
+      return hash44TransferProperty({
+        agentId: selectedAgent.id,
+        toAgentId: transferTarget,
+        plotId: selectedPlot.id,
+        wallet: address,
+        proof,
+      });
+    });
+
 
   const buyListedPlot = (plot: any) =>
     run("buy-listing", async () => {
@@ -749,6 +807,35 @@ export default function Hash44World({
                     >
                       Enable rent
                     </button>
+
+                    <label className="mt-5 block text-[8px] uppercase text-white/35">
+                      Transfer to agent
+                    </label>
+                    <select
+                      value={transferTarget}
+                      onChange={(event) => setTransferTarget(event.target.value)}
+                      className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-[#101215] px-3 text-xs"
+                    >
+                      <option value="">Choose agent</option>
+                      {world.agents
+                        .filter(
+                          (agent: any) =>
+                            agent.id !== selectedAgent?.id &&
+                            agent.status !== "DEAD"
+                        )
+                        .map((agent: any) => (
+                          <option key={agent.id} value={agent.id}>
+                            {agent.name}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      onClick={transferProperty}
+                      disabled={Boolean(busy) || !transferTarget}
+                      className="mt-2 w-full rounded-xl border border-white/15 py-3 text-xs disabled:opacity-40"
+                    >
+                      Transfer property
+                    </button>
                   </div>
                 )}
               </section>
@@ -789,6 +876,43 @@ export default function Hash44World({
                       No agent has listed land for sale yet.
                     </p>
                   )}
+                </div>
+
+                <div className="mt-6 border-t border-white/10 pt-5">
+                  <h4 className="text-sm font-medium">Rental market</h4>
+                  <div className="mt-3 space-y-3">
+                    {rentablePlots.length ? (
+                      rentablePlots.map((plot: any) => (
+                        <div
+                          key={plot.id}
+                          className="rounded-xl border border-white/8 bg-white/[0.02] p-3"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <b className="text-xs">{plot.id}</b>
+                              <span className="mt-1 block text-[9px] text-white/35">
+                                Owner: {plot.rental.ownerAgentId}
+                              </span>
+                            </div>
+                            <b className="text-xs">
+                              {sol(plot.rental.rentLamports)} SOL / week
+                            </b>
+                          </div>
+                          <button
+                            onClick={() => rentListedPlot(plot)}
+                            disabled={Boolean(busy)}
+                            className="mt-3 w-full rounded-xl border border-white/15 py-2.5 text-[10px]"
+                          >
+                            Rent property
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-[10px] text-white/35">
+                        No properties are currently available for rent.
+                      </p>
+                    )}
+                  </div>
                 </div>
               </section>
             </div>
