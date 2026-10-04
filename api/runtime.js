@@ -14,6 +14,9 @@ import {
   rentHash44PropertyInWorld,
   useHash44ChargingStationInWorld,
   buyHash44EquipmentInWorld,
+  listHash44EquipmentInWorld,
+  cancelHash44EquipmentListingInWorld,
+  buyListedHash44EquipmentInWorld,
 } from "../server/runtime/engine.js";
 import {
   verifyDevnetTransfer,
@@ -457,6 +460,71 @@ export default async function handler(req, res) {
       });
       return send(res, 200, { ok: true, equipment, world: publicWorld(world) });
     }
+
+
+    if (op === "hash44_list_equipment") {
+      verifyAction(input, "list_equipment");
+      let listing = null;
+      const world = await mutateWorld((state) => {
+        listing = listHash44EquipmentInWorld(state, {
+          agentId: input.agentId,
+          ownedItemId: input.ownedItemId,
+          wallet: input.wallet,
+          priceLamports: input.priceLamports,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, listing, world: publicWorld(world) });
+    }
+
+    if (op === "hash44_cancel_equipment_listing") {
+      verifyAction(input, "cancel_equipment_listing");
+      let equipment = null;
+      const world = await mutateWorld((state) => {
+        equipment = cancelHash44EquipmentListingInWorld(state, {
+          agentId: input.agentId,
+          ownedItemId: input.ownedItemId,
+          wallet: input.wallet,
+        });
+        return state;
+      });
+      return send(res, 200, { ok: true, equipment, world: publicWorld(world) });
+    }
+
+    if (op === "hash44_buy_equipment_listing") {
+      const current = await loadWorld();
+      const listing = current.hash44?.equipmentMarket?.find(
+        (candidate) =>
+          candidate.ownedItemId === input.ownedItemId &&
+          candidate.status === "LISTED"
+      );
+      if (!listing) {
+        return send(res, 400, { ok: false, error: "Equipment is not listed." });
+      }
+
+      const proof = await verifiedPayment({
+        signature: input.signature,
+        source: input.wallet,
+        destination: listing.sellerWallet,
+        lamports: Number(listing.priceLamports),
+      });
+
+      let equipment = null;
+      const world = await mutateWorld((state) => {
+        equipment = buyListedHash44EquipmentInWorld(state, {
+          buyerAgentId: input.agentId,
+          ownedItemId: input.ownedItemId,
+          buyerWallet: input.wallet,
+          signature: input.signature,
+          explorerUrl: proof.explorerUrl,
+          paidLamports: Number(listing.priceLamports),
+        });
+        return state;
+      });
+
+      return send(res, 200, { ok: true, equipment, world: publicWorld(world) });
+    }
+
 
     return send(res, 400, { ok: false, error: `Unknown runtime operation: ${op}` });
   } catch (error) {
