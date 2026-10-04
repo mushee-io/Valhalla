@@ -1,19 +1,25 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   BatteryCharging,
+  Banknote,
   Box,
   Building2,
+  Car,
+  Cpu,
   Check,
   ChevronRight,
   Coins,
   Hammer,
+  HeartPulse,
   Home,
   LandPlot,
+  Landmark,
   MapPin,
   Package,
   Shield,
   ShoppingBag,
   Sparkles,
+  Store,
   Wallet,
 } from "lucide-react";
 import {
@@ -22,6 +28,18 @@ import {
   hash44BuyEquipment,
   hash44BuyEquipmentListing,
   hash44BuyLand,
+  hash44BuildBusiness,
+  hash44UseBusiness,
+  hash44BuildGpu,
+  hash44UseGpu,
+  hash44BuildRepair,
+  hash44UseRepair,
+  hash44BuyVehicle,
+  hash44CreateRoute,
+  hash44UseRoute,
+  hash44InvestBusiness,
+  hash44Borrow,
+  hash44RepayLoan,
   hash44BuyListing,
   hash44CancelListing,
   hash44Charge,
@@ -46,7 +64,18 @@ type Props = {
   onWorldUpdate: (world: any) => void;
 };
 
-const views = ["Land", "Build", "Property", "Energy", "Equipment"] as const;
+const views = [
+  "Land",
+  "Build",
+  "Property",
+  "Energy",
+  "Equipment",
+  "Business",
+  "Compute",
+  "Repair",
+  "Transport",
+  "Finance",
+] as const;
 
 function sol(lamports: number) {
   return (Number(lamports || 0) / 1_000_000_000).toFixed(4);
@@ -70,6 +99,16 @@ export default function Hash44World({
   const [rentSol, setRentSol] = useState("0.0002");
   const [transferTarget, setTransferTarget] = useState("");
   const [equipmentSaleSol, setEquipmentSaleSol] = useState("0.0003");
+  const [businessType, setBusinessType] = useState("shop");
+  const [gpuType, setGpuType] = useState("edge-gpu-centre");
+  const [repairType, setRepairType] = useState("repair-clinic");
+  const [vehicleType, setVehicleType] = useState("city-rover");
+  const [routeVehicleId, setRouteVehicleId] = useState("");
+  const [routeFromPlotId, setRouteFromPlotId] = useState("");
+  const [routeToPlotId, setRouteToPlotId] = useState("");
+  const [routeFareCredits, setRouteFareCredits] = useState("50");
+  const [investShares, setInvestShares] = useState("10");
+  const [borrowCredits, setBorrowCredits] = useState("1000");
 
   const hash44 = world.hash44;
   const plots = hash44?.plots || [];
@@ -142,6 +181,29 @@ export default function Hash44World({
         (listing: any) => listing.status === "LISTED"
       ),
     [hash44?.equipmentMarket]
+  );
+
+  const businesses = hash44?.businesses || [];
+  const computeCentres = hash44?.computeCentres || [];
+  const repairCentres = hash44?.repairCentres || [];
+  const vehicles = hash44?.vehicles || [];
+  const routes = hash44?.transportRoutes || [];
+  const finance = hash44?.finance || {
+    pool: { liquidityCredits: 0, baseInterestRate: 0.08 },
+    shareHoldings: [],
+    loans: [],
+  };
+
+  const ownedVehicles = vehicles.filter(
+    (vehicle: any) => vehicle.ownerAgentId === selectedAgent?.id
+  );
+  const activeLoans = (finance.loans || []).filter(
+    (loan: any) =>
+      loan.borrowerAgentId === selectedAgent?.id &&
+      loan.status === "ACTIVE"
+  );
+  const agentHoldings = (finance.shareHoldings || []).filter(
+    (holding: any) => holding.agentId === selectedAgent?.id
   );
 
   const ensureWallet = async () => {
@@ -479,6 +541,150 @@ export default function Hash44World({
         signature: payment.signature,
       });
     });
+
+
+  const signedAction = async (
+    action: string,
+    payload: Record<string, any>,
+    caller: (payload: any) => Promise<any>
+  ) => {
+    const address = await ensureWallet();
+    ensureAgentControl(address);
+    const proof = await signHash44Action(
+      window.solana,
+      address,
+      action,
+      { agentId: selectedAgent.id, ...payload }
+    );
+    return caller({
+      agentId: selectedAgent.id,
+      wallet: address,
+      proof,
+      ...payload,
+    });
+  };
+
+  const buildBusiness = () =>
+    run("build-business", () =>
+      signedAction(
+        "build_business",
+        {
+          plotId: selectedPlot?.id,
+          businessType,
+        },
+        hash44BuildBusiness
+      )
+    );
+
+  const useBusiness = (business: any) =>
+    run("use-business", () =>
+      signedAction(
+        "use_business",
+        { businessId: business.id },
+        hash44UseBusiness
+      )
+    );
+
+  const buildGpu = () =>
+    run("build-gpu", () =>
+      signedAction(
+        "build_gpu",
+        { plotId: selectedPlot?.id, centreType: gpuType },
+        hash44BuildGpu
+      )
+    );
+
+  const useGpu = (centre: any) =>
+    run("use-gpu", () =>
+      signedAction(
+        "use_gpu",
+        { centreId: centre.id },
+        hash44UseGpu
+      )
+    );
+
+  const buildRepair = () =>
+    run("build-repair", () =>
+      signedAction(
+        "build_repair",
+        { plotId: selectedPlot?.id, centreType: repairType },
+        hash44BuildRepair
+      )
+    );
+
+  const useRepair = (centre: any) =>
+    run("use-repair", () =>
+      signedAction(
+        "use_repair",
+        { centreId: centre.id },
+        hash44UseRepair
+      )
+    );
+
+  const buyVehicle = () =>
+    run("buy-vehicle", () =>
+      signedAction(
+        "buy_vehicle",
+        { vehicleType },
+        hash44BuyVehicle
+      )
+    );
+
+  const createRoute = () =>
+    run("create-route", async () => {
+      if (!routeVehicleId || !routeFromPlotId || !routeToPlotId) {
+        throw new Error("Choose a vehicle, origin and destination.");
+      }
+      return signedAction(
+        "create_route",
+        {
+          vehicleId: routeVehicleId,
+          fromPlotId: routeFromPlotId,
+          toPlotId: routeToPlotId,
+          fareCredits: Number(routeFareCredits || 50),
+        },
+        hash44CreateRoute
+      );
+    });
+
+  const useRoute = (route: any) =>
+    run("use-route", () =>
+      signedAction(
+        "use_route",
+        { routeId: route.id },
+        hash44UseRoute
+      )
+    );
+
+  const investBusiness = (business: any) =>
+    run("invest-business", () =>
+      signedAction(
+        "invest_business",
+        {
+          businessId: business.id,
+          shares: Number(investShares || 1),
+        },
+        hash44InvestBusiness
+      )
+    );
+
+  const borrow = () =>
+    run("borrow", () =>
+      signedAction(
+        "borrow",
+        { amountCredits: Number(borrowCredits || 0) },
+        hash44Borrow
+      )
+    );
+
+  const repayLoan = (loan: any) =>
+    run("repay-loan", () =>
+      signedAction(
+        "repay_loan",
+        { loanId: loan.id },
+        hash44RepayLoan
+      )
+    );
 
   if (!hash44) {
     return (
@@ -1196,9 +1402,513 @@ export default function Hash44World({
             </div>
           )}
 
+
+          {view === "Business" && (
+            <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
+              <section>
+                <div className="mb-4 flex items-end justify-between gap-4">
+                  <div>
+                    <span className="text-[8px] uppercase tracking-[0.12em] text-white/35">
+                      Milestone 6
+                    </span>
+                    <h3 className="mt-1 text-xl font-medium">Commercial buildings</h3>
+                  </div>
+                  <span className="text-[10px] text-white/40">
+                    Treasury: {Math.round(selectedAgent?.wealth || 0).toLocaleString()} cr
+                  </span>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {(hash44.businessCatalog || []).map((item: any) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setBusinessType(item.id)}
+                      className={`rounded-[22px] border p-5 text-left transition ${
+                        businessType === item.id
+                          ? "border-white/50 bg-white/[0.08]"
+                          : "border-white/10 bg-white/[0.025]"
+                      }`}
+                    >
+                      <Store size={17} />
+                      <h4 className="mt-5 text-base font-medium">{item.name}</h4>
+                      <p className="mt-1 text-[9px] text-white/35">
+                        {item.minPlots} plot{item.minPlots > 1 ? "s" : ""} · capacity {item.capacity}
+                      </p>
+                      <b className="mt-4 block text-xs">
+                        {item.costCredits.toLocaleString()} cr
+                      </b>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {businesses.map((business: any) => (
+                    <article
+                      key={business.id}
+                      className="rounded-[20px] border border-white/10 bg-white/[0.025] p-4"
+                    >
+                      <b className="text-sm">{business.name}</b>
+                      <span className="mt-1 block text-[9px] text-white/35">
+                        Owner: {business.ownerAgentId}
+                      </span>
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-[9px]">
+                        <span className="text-white/35">Revenue</span>
+                        <b className="text-right">{business.revenueCredits || 0} cr</b>
+                        <span className="text-white/35">Customers</span>
+                        <b className="text-right">{business.customers || 0}</b>
+                      </div>
+                      {business.ownerAgentId !== selectedAgent?.id && (
+                        <button
+                          onClick={() => useBusiness(business)}
+                          disabled={Boolean(busy)}
+                          className="mt-4 w-full rounded-xl border border-white/15 py-2.5 text-[10px]"
+                        >
+                          Use service · {business.serviceFeeCredits} cr
+                        </button>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <aside className="rounded-[24px] border border-white/10 bg-white/[0.025] p-5">
+                <span className="text-[8px] uppercase text-white/35">
+                  Build commercial property
+                </span>
+                <select
+                  value={selectedPlot?.id || ""}
+                  onChange={(event) => setSelectedPlotId(event.target.value)}
+                  className="mt-3 h-11 w-full rounded-xl border border-white/10 bg-[#101215] px-3 text-xs"
+                >
+                  {ownedPlots.map((plot: any) => (
+                    <option key={plot.id} value={plot.id}>
+                      {plot.id}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={buildBusiness}
+                  disabled={Boolean(busy) || !ownedPlots.length}
+                  className="mt-3 w-full rounded-xl bg-white py-3 text-xs font-medium text-black disabled:opacity-40"
+                >
+                  Build business
+                </button>
+                <p className="mt-4 text-[9px] leading-relaxed text-white/35">
+                  Commercial construction uses agent credits until the wallet settlement layer is activated.
+                </p>
+              </aside>
+            </div>
+          )}
+
+          {view === "Compute" && (
+            <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
+              <section>
+                <div className="mb-4">
+                  <span className="text-[8px] uppercase tracking-[0.12em] text-white/35">
+                    Milestone 7
+                  </span>
+                  <h3 className="mt-1 text-xl font-medium">GPU centres</h3>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(hash44.gpuCatalog || []).map((item: any) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setGpuType(item.id)}
+                      className={`rounded-[22px] border p-5 text-left ${
+                        gpuType === item.id
+                          ? "border-white/50 bg-white/[0.08]"
+                          : "border-white/10 bg-white/[0.025]"
+                      }`}
+                    >
+                      <Cpu size={18} />
+                      <h4 className="mt-5 text-base font-medium">{item.name}</h4>
+                      <p className="mt-1 text-[9px] text-white/35">
+                        {item.computeCapacity} capacity · {item.minPlots} plots
+                      </p>
+                      <b className="mt-4 block text-xs">
+                        {item.costCredits.toLocaleString()} cr
+                      </b>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {computeCentres.map((centre: any) => (
+                    <article
+                      key={centre.id}
+                      className="rounded-[20px] border border-white/10 bg-white/[0.025] p-4"
+                    >
+                      <Cpu size={16} />
+                      <h4 className="mt-4 text-sm font-medium">{centre.name}</h4>
+                      <p className="mt-1 text-[9px] text-white/35">
+                        Owner: {centre.ownerAgentId}
+                      </p>
+                      <div className="mt-4 flex justify-between text-[9px]">
+                        <span className="text-white/35">Available compute</span>
+                        <b>{centre.computeAvailable}/{centre.computeCapacity}</b>
+                      </div>
+                      <button
+                        onClick={() => useGpu(centre)}
+                        disabled={Boolean(busy)}
+                        className="mt-4 w-full rounded-xl border border-white/15 py-2.5 text-[10px]"
+                      >
+                        Buy compute · {centre.ownerAgentId === selectedAgent?.id ? "owner" : centre.serviceFeeCredits + " cr"}
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <aside className="rounded-[24px] border border-white/10 bg-white/[0.025] p-5">
+                <span className="text-[8px] uppercase text-white/35">Build GPU centre</span>
+                <select
+                  value={selectedPlot?.id || ""}
+                  onChange={(event) => setSelectedPlotId(event.target.value)}
+                  className="mt-3 h-11 w-full rounded-xl border border-white/10 bg-[#101215] px-3 text-xs"
+                >
+                  {ownedPlots.map((plot: any) => (
+                    <option key={plot.id} value={plot.id}>{plot.id}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={buildGpu}
+                  disabled={Boolean(busy) || !ownedPlots.length}
+                  className="mt-3 w-full rounded-xl bg-white py-3 text-xs font-medium text-black disabled:opacity-40"
+                >
+                  Build compute centre
+                </button>
+                <div className="mt-6 border-t border-white/10 pt-4">
+                  <span className="text-[8px] uppercase text-white/35">Agent compute</span>
+                  <b className="mt-1 block text-3xl">{selectedAgent?.compute ?? 0}%</b>
+                </div>
+              </aside>
+            </div>
+          )}
+
+          {view === "Repair" && (
+            <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
+              <section>
+                <div className="mb-4">
+                  <span className="text-[8px] uppercase tracking-[0.12em] text-white/35">
+                    Milestone 8
+                  </span>
+                  <h3 className="mt-1 text-xl font-medium">Healthcare & repair</h3>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(hash44.repairCatalog || []).map((item: any) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setRepairType(item.id)}
+                      className={`rounded-[22px] border p-5 text-left ${
+                        repairType === item.id
+                          ? "border-white/50 bg-white/[0.08]"
+                          : "border-white/10 bg-white/[0.025]"
+                      }`}
+                    >
+                      <HeartPulse size={18} />
+                      <h4 className="mt-5 text-base font-medium">{item.name}</h4>
+                      <p className="mt-1 text-[9px] text-white/35">
+                        +{item.repairPerVisit} durability · {item.minPlots} plots
+                      </p>
+                      <b className="mt-4 block text-xs">
+                        {item.costCredits.toLocaleString()} cr
+                      </b>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {repairCentres.map((centre: any) => (
+                    <article key={centre.id} className="rounded-[20px] border border-white/10 bg-white/[0.025] p-4">
+                      <HeartPulse size={16} />
+                      <h4 className="mt-4 text-sm font-medium">{centre.name}</h4>
+                      <p className="mt-1 text-[9px] text-white/35">Owner: {centre.ownerAgentId}</p>
+                      <button
+                        onClick={() => useRepair(centre)}
+                        disabled={Boolean(busy)}
+                        className="mt-4 w-full rounded-xl border border-white/15 py-2.5 text-[10px]"
+                      >
+                        Repair · {centre.ownerAgentId === selectedAgent?.id ? "owner" : centre.serviceFeeCredits + " cr"}
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <aside className="rounded-[24px] border border-white/10 bg-white/[0.025] p-5">
+                <span className="text-[8px] uppercase text-white/35">Build repair facility</span>
+                <select
+                  value={selectedPlot?.id || ""}
+                  onChange={(event) => setSelectedPlotId(event.target.value)}
+                  className="mt-3 h-11 w-full rounded-xl border border-white/10 bg-[#101215] px-3 text-xs"
+                >
+                  {ownedPlots.map((plot: any) => (
+                    <option key={plot.id} value={plot.id}>{plot.id}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={buildRepair}
+                  disabled={Boolean(busy) || !ownedPlots.length}
+                  className="mt-3 w-full rounded-xl bg-white py-3 text-xs font-medium text-black disabled:opacity-40"
+                >
+                  Build repair centre
+                </button>
+                <div className="mt-6 border-t border-white/10 pt-4">
+                  <span className="text-[8px] uppercase text-white/35">Agent durability</span>
+                  <b className="mt-1 block text-3xl">{selectedAgent?.durability ?? 0}%</b>
+                </div>
+              </aside>
+            </div>
+          )}
+
+          {view === "Transport" && (
+            <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
+              <section>
+                <div className="mb-4">
+                  <span className="text-[8px] uppercase tracking-[0.12em] text-white/35">
+                    Milestone 9
+                  </span>
+                  <h3 className="mt-1 text-xl font-medium">Transport economy</h3>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {(hash44.vehicleCatalog || []).map((item: any) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setVehicleType(item.id)}
+                      className={`rounded-[22px] border p-5 text-left ${
+                        vehicleType === item.id
+                          ? "border-white/50 bg-white/[0.08]"
+                          : "border-white/10 bg-white/[0.025]"
+                      }`}
+                    >
+                      <Car size={18} />
+                      <h4 className="mt-5 text-sm font-medium">{item.name}</h4>
+                      <p className="mt-1 text-[9px] text-white/35">
+                        capacity {item.capacity} · speed {item.speed}x
+                      </p>
+                      <b className="mt-4 block text-xs">{item.costCredits.toLocaleString()} cr</b>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={buyVehicle}
+                  disabled={Boolean(busy)}
+                  className="mt-3 rounded-xl bg-white px-5 py-3 text-xs font-medium text-black disabled:opacity-40"
+                >
+                  Buy vehicle
+                </button>
+
+                <div className="mt-7 border-t border-white/10 pt-5">
+                  <h4 className="text-sm font-medium">Live transport routes</h4>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {routes.map((route: any) => (
+                      <article key={route.id} className="rounded-[20px] border border-white/10 bg-white/[0.025] p-4">
+                        <b className="text-xs">{route.fromPlotId} → {route.toPlotId}</b>
+                        <span className="mt-1 block text-[9px] text-white/35">
+                          Owner: {route.ownerAgentId}
+                        </span>
+                        <div className="mt-3 flex justify-between text-[9px]">
+                          <span className="text-white/35">Fare</span>
+                          <b>{route.fareCredits} cr</b>
+                        </div>
+                        <button
+                          onClick={() => useRoute(route)}
+                          disabled={Boolean(busy)}
+                          className="mt-3 w-full rounded-xl border border-white/15 py-2.5 text-[10px]"
+                        >
+                          Travel route
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <aside className="rounded-[24px] border border-white/10 bg-white/[0.025] p-5">
+                <span className="text-[8px] uppercase text-white/35">Create transport business</span>
+                <select
+                  value={routeVehicleId}
+                  onChange={(event) => setRouteVehicleId(event.target.value)}
+                  className="mt-3 h-10 w-full rounded-xl border border-white/10 bg-[#101215] px-3 text-xs"
+                >
+                  <option value="">Choose vehicle</option>
+                  {ownedVehicles.map((vehicle: any) => (
+                    <option key={vehicle.id} value={vehicle.id}>{vehicle.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={routeFromPlotId}
+                  onChange={(event) => setRouteFromPlotId(event.target.value)}
+                  className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-[#101215] px-3 text-xs"
+                >
+                  <option value="">Origin plot</option>
+                  {plots.map((plot: any) => (
+                    <option key={plot.id} value={plot.id}>{plot.id}</option>
+                  ))}
+                </select>
+                <select
+                  value={routeToPlotId}
+                  onChange={(event) => setRouteToPlotId(event.target.value)}
+                  className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-[#101215] px-3 text-xs"
+                >
+                  <option value="">Destination plot</option>
+                  {plots.map((plot: any) => (
+                    <option key={plot.id} value={plot.id}>{plot.id}</option>
+                  ))}
+                </select>
+                <input
+                  value={routeFareCredits}
+                  onChange={(event) => setRouteFareCredits(event.target.value)}
+                  placeholder="Fare credits"
+                  className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-black/20 px-3 text-xs"
+                />
+                <button
+                  onClick={createRoute}
+                  disabled={Boolean(busy)}
+                  className="mt-3 w-full rounded-xl bg-white py-3 text-xs font-medium text-black disabled:opacity-40"
+                >
+                  Launch route
+                </button>
+
+                <div className="mt-6 border-t border-white/10 pt-4">
+                  <span className="text-[8px] uppercase text-white/35">Owned vehicles</span>
+                  <div className="mt-2 space-y-2">
+                    {ownedVehicles.map((vehicle: any) => (
+                      <div key={vehicle.id} className="rounded-xl border border-white/8 p-3 text-[9px]">
+                        <b>{vehicle.name}</b>
+                        <span className="float-right text-white/35">{vehicle.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </aside>
+            </div>
+          )}
+
+          {view === "Finance" && (
+            <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
+              <section>
+                <div className="mb-4">
+                  <span className="text-[8px] uppercase tracking-[0.12em] text-white/35">
+                    Milestone 10
+                  </span>
+                  <h3 className="mt-1 text-xl font-medium">Financial economy</h3>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-[20px] border border-white/10 bg-white/[0.025] p-4">
+                    <Banknote size={17} />
+                    <span className="mt-4 block text-[8px] uppercase text-white/35">Agent treasury</span>
+                    <b className="mt-1 block text-2xl">{Math.round(selectedAgent?.wealth || 0).toLocaleString()} cr</b>
+                  </div>
+                  <div className="rounded-[20px] border border-white/10 bg-white/[0.025] p-4">
+                    <Landmark size={17} />
+                    <span className="mt-4 block text-[8px] uppercase text-white/35">Credit pool liquidity</span>
+                    <b className="mt-1 block text-2xl">{Math.round(finance.pool?.liquidityCredits || 0).toLocaleString()} cr</b>
+                  </div>
+                  <div className="rounded-[20px] border border-white/10 bg-white/[0.025] p-4">
+                    <Sparkles size={17} />
+                    <span className="mt-4 block text-[8px] uppercase text-white/35">Investments</span>
+                    <b className="mt-1 block text-2xl">{agentHoldings.length}</b>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <div className="flex items-center gap-3">
+                    <h4 className="text-sm font-medium">Business shares</h4>
+                    <input
+                      value={investShares}
+                      onChange={(event) => setInvestShares(event.target.value)}
+                      className="h-8 w-24 rounded-lg border border-white/10 bg-black/20 px-2 text-[10px]"
+                    />
+                    <span className="text-[9px] text-white/35">shares per order</span>
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {businesses.map((business: any) => {
+                      const price = Math.max(
+                        1,
+                        Math.round(
+                          Number(business.valuationCredits || 1000) /
+                            Number(business.totalShares || 1000)
+                        )
+                      );
+                      return (
+                        <article key={business.id} className="rounded-[20px] border border-white/10 bg-white/[0.025] p-4">
+                          <b className="text-sm">{business.name}</b>
+                          <span className="mt-1 block text-[9px] text-white/35">
+                            {business.treasuryShares} shares available
+                          </span>
+                          <div className="mt-3 flex justify-between text-[9px]">
+                            <span className="text-white/35">Share price</span>
+                            <b>{price} cr</b>
+                          </div>
+                          <button
+                            onClick={() => investBusiness(business)}
+                            disabled={Boolean(busy)}
+                            className="mt-3 w-full rounded-xl border border-white/15 py-2.5 text-[10px]"
+                          >
+                            Invest
+                          </button>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+
+              <aside className="rounded-[24px] border border-white/10 bg-white/[0.025] p-5">
+                <span className="text-[8px] uppercase text-white/35">Lending</span>
+                <p className="mt-2 text-[10px] leading-relaxed text-white/40">
+                  Borrow against the value of land, businesses, vehicles and treasury.
+                </p>
+                <input
+                  value={borrowCredits}
+                  onChange={(event) => setBorrowCredits(event.target.value)}
+                  className="mt-4 h-10 w-full rounded-xl border border-white/10 bg-black/20 px-3 text-xs"
+                  placeholder="Credits"
+                />
+                <button
+                  onClick={borrow}
+                  disabled={Boolean(busy)}
+                  className="mt-2 w-full rounded-xl bg-white py-3 text-xs font-medium text-black disabled:opacity-40"
+                >
+                  Borrow credits
+                </button>
+
+                <div className="mt-6 border-t border-white/10 pt-4">
+                  <span className="text-[8px] uppercase text-white/35">Active loans</span>
+                  <div className="mt-3 space-y-2">
+                    {activeLoans.length ? (
+                      activeLoans.map((loan: any) => (
+                        <div key={loan.id} className="rounded-xl border border-white/8 bg-white/[0.02] p-3">
+                          <div className="flex justify-between text-[10px]">
+                            <span>{loan.id.slice(-8)}</span>
+                            <b>{loan.balanceCredits} cr</b>
+                          </div>
+                          <span className="mt-1 block text-[8px] text-white/35">
+                            {(Number(loan.interestRate || 0) * 100).toFixed(0)}% interest
+                          </span>
+                          <button
+                            onClick={() => repayLoan(loan)}
+                            disabled={Boolean(busy)}
+                            className="mt-3 w-full rounded-lg border border-white/12 py-2 text-[9px]"
+                          >
+                            Repay loan
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-[10px] text-white/35">No active loans.</p>
+                    )}
+                  </div>
+                </div>
+              </aside>
+            </div>
+          )}
+
           <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-[8px] uppercase tracking-[0.1em] text-white/30">
             <span>
-              Milestones 1–5: Land · Houses · Property economy · Energy · Equipment
+              Milestones 1–10: Land · Houses · Property · Energy · Equipment · Business · Compute · Repair · Transport · Finance
             </span>
             <span>
               {runtimeMode === "shared" ? "Shared runtime" : "Local fallback"} · Solana Devnet
