@@ -1,5 +1,12 @@
 import { chooseAgentAction } from "./brain.js";
-import {\n  RUNTIME_RESOURCES,\n  HASH44_STRUCTURE_CATALOG,\n  HASH44_EQUIPMENT_CATALOG,\n  ensureHash44State,\n  resourceById,\n  zoneById,\n} from "./model.js";
+import {
+  RUNTIME_RESOURCES,
+  HASH44_STRUCTURE_CATALOG,
+  HASH44_EQUIPMENT_CATALOG,
+  ensureHash44State,
+  resourceById,
+  zoneById,
+} from "./model.js";
 
 const PROPERTY_TYPES = {
   charger: { cost: 2400, fee: 42 },
