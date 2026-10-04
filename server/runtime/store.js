@@ -1,5 +1,5 @@
 import { neon } from "@neondatabase/serverless";
-import { createSharedWorld } from "./model.js";
+import { createSharedWorld, ensureHash44State } from "./model.js";
 
 const WORLD_ID = "valhalla-main";
 const globalKey = "__VALHALLA_SHARED_RUNTIME__";
@@ -78,7 +78,7 @@ async function loadDatabaseWorld(sql) {
     return initial;
   }
 
-  const world = rows[0].state;
+  const world = ensureHash44State(rows[0].state);
   world.revision = Number(rows[0].revision || world.revision || 1);
   world.storageMode = "persistent";
   return world;
@@ -88,6 +88,7 @@ export async function loadWorld() {
   const sql = sqlClient();
   if (!sql) {
     const container = memoryContainer();
+    container.world = ensureHash44State(container.world);
     container.world.storageMode = "ephemeral";
     return structuredClone(container.world);
   }
@@ -97,6 +98,7 @@ export async function loadWorld() {
   } catch (error) {
     console.error("Valhalla persistent store failed; using ephemeral fallback", error);
     const container = memoryContainer();
+    container.world = ensureHash44State(container.world);
     container.world.storageMode = "ephemeral";
     container.world.storageError = error?.message || "database unavailable";
     return structuredClone(container.world);
