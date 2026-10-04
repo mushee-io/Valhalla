@@ -1783,3 +1783,134 @@ export function buyHash44EquipmentInWorld(
 
   return ownedItem;
 }
+
+
+export function listHash44EquipmentInWorld(
+  world,
+  { agentId, ownedItemId, wallet, priceLamports }
+) {
+  ensureHash44State(world);
+  const agent = hash44Agent(world, agentId, wallet);
+  const item = (agent.inventory?.equipment || []).find(
+    (candidate) => candidate.id === ownedItemId
+  );
+  if (!item) throw new Error("Equipment item is not owned by this agent.");
+
+  const price = Math.max(50000, Math.round(Number(priceLamports || 0)));
+  item.sale = {
+    sellerAgentId: agent.id,
+    sellerWallet: wallet,
+    priceLamports: price,
+    listedAt: new Date().toISOString(),
+  };
+
+  const existing = world.hash44.equipmentMarket.find(
+    (listing) => listing.ownedItemId === item.id
+  );
+
+  const listing = {
+    id: existing?.id || `H44-EQ-LIST-${Date.now().toString(36)}`,
+    ownedItemId: item.id,
+    catalogId: item.catalogId,
+    name: item.name,
+    category: item.category,
+    sellerAgentId: agent.id,
+    sellerWallet: wallet,
+    priceLamports: price,
+    status: "LISTED",
+    listedAt: item.sale.listedAt,
+  };
+
+  if (existing) Object.assign(existing, listing);
+  else world.hash44.equipmentMarket.unshift(listing);
+
+  return listing;
+}
+
+export function cancelHash44EquipmentListingInWorld(
+  world,
+  { agentId, ownedItemId, wallet }
+) {
+  ensureHash44State(world);
+  const agent = hash44Agent(world, agentId, wallet);
+  const item = (agent.inventory?.equipment || []).find(
+    (candidate) => candidate.id === ownedItemId
+  );
+  if (!item) throw new Error("Equipment item is not owned by this agent.");
+
+  item.sale = null;
+  const listing = world.hash44.equipmentMarket.find(
+    (candidate) => candidate.ownedItemId === ownedItemId
+  );
+  if (listing) listing.status = "CANCELLED";
+  return item;
+}
+
+export function buyListedHash44EquipmentInWorld(
+  world,
+  {
+    buyerAgentId,
+    ownedItemId,
+    buyerWallet,
+    signature,
+    explorerUrl,
+    paidLamports,
+  }
+) {
+  ensureHash44State(world);
+  const buyer = hash44Agent(world, buyerAgentId, buyerWallet);
+  const listing = world.hash44.equipmentMarket.find(
+    (candidate) =>
+      candidate.ownedItemId === ownedItemId &&
+      candidate.status === "LISTED"
+  );
+  if (!listing) throw new Error("Equipment listing is no longer active.");
+
+  if (listing.sellerAgentId === buyer.id) {
+    throw new Error("Agent already owns this equipment.");
+  }
+
+  if (Number(paidLamports || 0) < Number(listing.priceLamports)) {
+    throw new Error("Verified payment is below equipment listing price.");
+  }
+
+  const seller = hash44Agent(world, listing.sellerAgentId);
+  const sellerItems = seller.inventory?.equipment || [];
+  const itemIndex = sellerItems.findIndex(
+    (candidate) => candidate.id === ownedItemId
+  );
+  if (itemIndex < 0) throw new Error("Seller no longer owns this equipment.");
+
+  const [item] = sellerItems.splice(itemIndex, 1);
+  item.sale = null;
+  item.lastTransferSignature = signature;
+  item.lastTransferExplorerUrl = explorerUrl;
+  item.transferredAt = new Date().toISOString();
+
+  buyer.inventory.equipment ||= [];
+  buyer.inventory.equipment.push(item);
+
+  listing.status = "SOLD";
+  listing.buyerAgentId = buyer.id;
+  listing.soldAt = item.transferredAt;
+  listing.signature = signature;
+  listing.explorerUrl = explorerUrl;
+
+  world.metrics.equipmentSales =
+    Number(world.metrics.equipmentSales || 0) + 1;
+
+  remember(
+    buyer,
+    world,
+    "equipment_trade",
+    `Bought ${item.name} from ${seller.name} for ${Number(paidLamports) / 1e9} SOL.`
+  );
+  remember(
+    seller,
+    world,
+    "equipment_trade",
+    `Sold ${item.name} to ${buyer.name} for ${Number(paidLamports) / 1e9} SOL.`
+  );
+
+  return item;
+}
