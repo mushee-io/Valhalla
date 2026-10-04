@@ -1,7 +1,8 @@
-export const RUNTIME_VERSION = 18;
+export const RUNTIME_VERSION = 23;
 
 export const WORLD_ZONES = [
   { id: "genesis-port", name: "Genesis World", kind: "origin", risk: 8, resource: "compute", x: 48, y: 47 },
+  { id: "earth", name: "Earth", kind: "planet", risk: 6, resource: "land", x: 50, y: 36 },
   { id: "meme-valley", name: "Meme Valley", kind: "token", risk: 44, resource: "attention", x: 22, y: 21 },
   { id: "jupiter", name: "Jupiter Exchange", kind: "liquidity", risk: 24, resource: "liquidity", x: 75, y: 19 },
   { id: "raydium", name: "Raydium Foundry", kind: "liquidity", risk: 36, resource: "liquidity", x: 79, y: 72 },
@@ -17,6 +18,23 @@ export const RUNTIME_RESOURCES = [
   { id: "data", basePrice: 93 },
   { id: "attention", basePrice: 64 },
   { id: "liquidity", basePrice: 150 },
+];
+
+export const HASH44_STRUCTURE_CATALOG = [
+  { id: "small-shelter", name: "Small Shelter", category: "house", costLamports: 500000, minPlots: 1, buildSeconds: 15, footprint: 1 },
+  { id: "bungalow", name: "Bungalow", category: "house", costLamports: 1000000, minPlots: 1, buildSeconds: 20, footprint: 1 },
+  { id: "standard-house", name: "Standard House", category: "house", costLamports: 1500000, minPlots: 1, buildSeconds: 25, footprint: 1 },
+  { id: "large-house", name: "Large House", category: "house", costLamports: 3000000, minPlots: 2, buildSeconds: 35, footprint: 2 },
+  { id: "mansion", name: "Mansion", category: "house", costLamports: 6000000, minPlots: 3, buildSeconds: 45, footprint: 3 },
+  { id: "charging-station", name: "Charging Station", category: "energy", costLamports: 2000000, minPlots: 1, buildSeconds: 25, footprint: 1, energyPerVisit: 35, defaultChargeLamports: 100000 },
+];
+
+export const HASH44_EQUIPMENT_CATALOG = [
+  { id: "utility-jacket", name: "Utility Jacket", category: "clothing", costLamports: 100000, protection: 2, durability: 100 },
+  { id: "field-armour", name: "Field Armour", category: "armour", costLamports: 300000, protection: 12, durability: 100 },
+  { id: "builder-toolkit", name: "Builder Toolkit", category: "tool", costLamports: 200000, buildBoost: 0.1, durability: 100 },
+  { id: "survey-drone", name: "Survey Drone", category: "tool", costLamports: 250000, explorationBoost: 0.12, durability: 100 },
+  { id: "compute-module", name: "Compute Module", category: "upgrade", costLamports: 400000, computeBoost: 10, durability: 100 },
 ];
 
 const SEEDS = [
@@ -42,6 +60,7 @@ function inventory(index) {
     data: index % 3 === 0 ? 1 : 0,
     attention: 0,
     liquidity: 0,
+    equipment: [],
   };
 }
 
@@ -74,6 +93,8 @@ function agent(tuple, index) {
     inventory: inventory(index),
     property: 0,
     properties: [],
+    landPlotIds: [],
+    structureIds: [],
     companyId: null,
     teamId: null,
     nationId: null,
@@ -113,9 +134,108 @@ function priceBook(zone, zoneIndex) {
   );
 }
 
+function createHash44Plots() {
+  const rows = 6;
+  const cols = 8;
+  const plots = [];
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const index = row * cols + col + 1;
+      const rowName = String.fromCharCode(65 + row);
+      plots.push({
+        id: `H44-NS-${rowName}${String(col + 1).padStart(2, "0")}`,
+        provinceId: "northstar",
+        gridX: col,
+        gridY: row,
+        coordinates: {
+          lat: Number((53.1000 + row * 0.0065).toFixed(4)),
+          lng: Number((-106.2000 + col * 0.0085).toFixed(4)),
+        },
+        sizeSqm: 1000,
+        priceLamports: 100000,
+        status: "AVAILABLE",
+        ownerAgentId: null,
+        ownerWallet: null,
+        purchasePriceLamports: null,
+        purchasedAt: null,
+        purchaseSignature: null,
+        purchaseExplorerUrl: null,
+        structureIds: [],
+        sale: null,
+        rental: null,
+        estateId: null,
+        index,
+      });
+    }
+  }
+  return plots;
+}
+
+export function createHash44State() {
+  return {
+    id: "hash44",
+    name: "Hash 44 World",
+    planetId: "earth",
+    province: {
+      id: "northstar",
+      name: "Northstar Province",
+      style: "Canada-style frontier province",
+      rows: 6,
+      cols: 8,
+    },
+    landPriceLamports: 100000,
+    plots: createHash44Plots(),
+    structures: [],
+    propertyTransfers: [],
+    rentPayments: [],
+    equipmentCatalog: HASH44_EQUIPMENT_CATALOG,
+    structureCatalog: HASH44_STRUCTURE_CATALOG,
+    energy: {
+      rechargeBaseLamports: 100000,
+      visits: [],
+    },
+    milestones: {
+      land: true,
+      houses: true,
+      propertyEconomy: true,
+      energy: true,
+      equipment: true,
+    },
+  };
+}
+
+export function ensureHash44State(world) {
+  if (!Array.isArray(world.zones)) world.zones = [];
+  if (!world.zones.some((zone) => zone.id === "earth")) {
+    world.zones.splice(1, 0, WORLD_ZONES.find((zone) => zone.id === "earth"));
+  }
+
+  if (!world.hash44) world.hash44 = createHash44State();
+  if (!Array.isArray(world.hash44.plots) || world.hash44.plots.length === 0) {
+    world.hash44.plots = createHash44Plots();
+  }
+  world.hash44.structureCatalog = HASH44_STRUCTURE_CATALOG;
+  world.hash44.equipmentCatalog = HASH44_EQUIPMENT_CATALOG;
+  world.hash44.structures ||= [];
+  world.hash44.propertyTransfers ||= [];
+  world.hash44.rentPayments ||= [];
+  world.hash44.energy ||= { rechargeBaseLamports: 100000, visits: [] };
+  world.hash44.energy.visits ||= [];
+
+  for (const agent of world.agents || []) {
+    agent.landPlotIds ||= [];
+    agent.structureIds ||= [];
+    agent.inventory ||= {};
+    agent.inventory.equipment ||= [];
+  }
+
+  world.runtimeVersion = RUNTIME_VERSION;
+  return world;
+}
+
 export function createSharedWorld() {
   const agents = SEEDS.map(agent);
-  return {
+  return ensureHash44State({
     runtimeVersion: RUNTIME_VERSION,
     id: "valhalla-main",
     revision: 1,
@@ -129,7 +249,7 @@ export function createSharedWorld() {
     zones: WORLD_ZONES,
     agents,
     markets: Object.fromEntries(
-      WORLD_ZONES.map((zone, index) => [zone.id, priceBook(zone, index)])
+      WORLD_ZONES.filter((zone) => zone.resource !== "land").map((zone, index) => [zone.id, priceBook(zone, index)])
     ),
     properties: [],
     teams: [],
@@ -171,6 +291,9 @@ export function createSharedWorld() {
       propertyReceipts: [],
       treasuryReceipts: [],
       tokenReceipts: [],
+      landReceipts: [],
+      buildingReceipts: [],
+      equipmentReceipts: [],
       pendingIntents: [],
     },
     metrics: {
@@ -180,6 +303,11 @@ export function createSharedWorld() {
       messages: 0,
       contractsSettled: 0,
       tokensLaunched: 1,
+      landSales: 0,
+      structuresBuilt: 0,
+      rentPayments: 0,
+      energyPayments: 0,
+      equipmentSales: 0,
     },
     events: [
       {
@@ -187,15 +315,15 @@ export function createSharedWorld() {
         tick: 0,
         type: "genesis",
         title: "Shared civilization runtime initialized",
-        detail: "Agent runtime, relationships, teams, Meme Valley, worlds and governance are online.",
+        detail: "Hash 44 Earth land, housing, property economy, energy and equipment layers are online.",
         createdAt: new Date().toISOString(),
       },
     ],
-  };
+  });
 }
 
 export function zoneById(world, id) {
-  return world.zones.find((zone) => zone.id === id);
+  return (world.zones || []).find((zone) => zone.id === id);
 }
 
 export function resourceById(id) {
@@ -203,7 +331,7 @@ export function resourceById(id) {
 }
 
 export function relationship(world, a, b) {
-  return world.relationships.find(
+  return (world.relationships || []).find(
     (item) =>
       (item.a === a && item.b === b) ||
       (item.a === b && item.b === a)
