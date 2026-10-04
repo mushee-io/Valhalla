@@ -1,4 +1,4 @@
-export const RUNTIME_VERSION = 23;
+export const RUNTIME_VERSION = 28;
 
 export const WORLD_ZONES = [
   { id: "genesis-port", name: "Genesis World", kind: "origin", risk: 8, resource: "compute", x: 48, y: 47 },
@@ -35,6 +35,31 @@ export const HASH44_EQUIPMENT_CATALOG = [
   { id: "builder-toolkit", name: "Builder Toolkit", category: "tool", costLamports: 200000, buildBoost: 0.1, durability: 100 },
   { id: "survey-drone", name: "Survey Drone", category: "tool", costLamports: 250000, explorationBoost: 0.12, durability: 100 },
   { id: "compute-module", name: "Compute Module", category: "upgrade", costLamports: 400000, computeBoost: 10, durability: 100 },
+];
+
+
+export const HASH44_BUSINESS_CATALOG = [
+  { id: "shop", name: "Retail Shop", category: "commercial", costCredits: 3500, minPlots: 1, serviceFeeCredits: 80, capacity: 18 },
+  { id: "marketplace", name: "Marketplace", category: "commercial", costCredits: 5500, minPlots: 2, serviceFeeCredits: 120, capacity: 42 },
+  { id: "warehouse", name: "Warehouse", category: "commercial", costCredits: 4200, minPlots: 2, serviceFeeCredits: 95, capacity: 70 },
+  { id: "apartment-building", name: "Apartment Building", category: "commercial", costCredits: 7600, minPlots: 3, serviceFeeCredits: 140, capacity: 36 },
+  { id: "office", name: "Office", category: "commercial", costCredits: 5000, minPlots: 2, serviceFeeCredits: 105, capacity: 28 },
+];
+
+export const HASH44_GPU_CATALOG = [
+  { id: "edge-gpu-centre", name: "Edge GPU Centre", category: "compute", costCredits: 12000, minPlots: 3, computeCapacity: 120, computePerVisit: 24, serviceFeeCredits: 180, energyDraw: 8 },
+  { id: "regional-gpu-centre", name: "Regional GPU Centre", category: "compute", costCredits: 22000, minPlots: 4, computeCapacity: 280, computePerVisit: 48, serviceFeeCredits: 360, energyDraw: 15 },
+];
+
+export const HASH44_REPAIR_CATALOG = [
+  { id: "repair-clinic", name: "Repair Clinic", category: "repair", costCredits: 6000, minPlots: 2, repairPerVisit: 30, serviceFeeCredits: 160 },
+  { id: "agent-hospital", name: "Agent Hospital", category: "repair", costCredits: 11500, minPlots: 3, repairPerVisit: 65, serviceFeeCredits: 300 },
+];
+
+export const HASH44_VEHICLE_CATALOG = [
+  { id: "city-rover", name: "City Rover", category: "vehicle", costCredits: 1800, speed: 1.0, capacity: 1, energyCost: 2 },
+  { id: "cargo-hauler", name: "Cargo Hauler", category: "vehicle", costCredits: 4200, speed: 0.75, capacity: 8, energyCost: 5 },
+  { id: "autonomous-shuttle", name: "Autonomous Shuttle", category: "vehicle", costCredits: 6500, speed: 1.25, capacity: 6, energyCost: 4 },
 ];
 
 const SEEDS = [
@@ -195,12 +220,40 @@ export function createHash44State() {
       rechargeBaseLamports: 100000,
       visits: [],
     },
+    businessCatalog: HASH44_BUSINESS_CATALOG,
+    gpuCatalog: HASH44_GPU_CATALOG,
+    repairCatalog: HASH44_REPAIR_CATALOG,
+    vehicleCatalog: HASH44_VEHICLE_CATALOG,
+    businesses: [],
+    computeCentres: [],
+    repairCentres: [],
+    vehicles: [],
+    transportRoutes: [],
+    serviceTransactions: [],
+    finance: {
+      pool: {
+        id: "hash44-credit-pool",
+        name: "Hash 44 Credit Pool",
+        liquidityCredits: 250000,
+        baseInterestRate: 0.08,
+        totalBorrowed: 0,
+        totalRepaid: 0,
+      },
+      shareHoldings: [],
+      loans: [],
+      investmentTransactions: [],
+    },
     milestones: {
       land: true,
       houses: true,
       propertyEconomy: true,
       energy: true,
       equipment: true,
+      commercial: true,
+      gpuCentres: true,
+      healthcare: true,
+      transport: true,
+      finance: true,
     },
   };
 }
@@ -218,7 +271,42 @@ export function ensureHash44State(world) {
   world.hash44.structureCatalog = HASH44_STRUCTURE_CATALOG;
   world.hash44.equipmentCatalog = HASH44_EQUIPMENT_CATALOG;
   world.hash44.equipmentMarket ||= [];
+  world.hash44.structureCatalog = HASH44_STRUCTURE_CATALOG;
+  world.hash44.businessCatalog = HASH44_BUSINESS_CATALOG;
+  world.hash44.gpuCatalog = HASH44_GPU_CATALOG;
+  world.hash44.repairCatalog = HASH44_REPAIR_CATALOG;
+  world.hash44.vehicleCatalog = HASH44_VEHICLE_CATALOG;
   world.hash44.structures ||= [];
+  world.hash44.businesses ||= [];
+  world.hash44.computeCentres ||= [];
+  world.hash44.repairCentres ||= [];
+  world.hash44.vehicles ||= [];
+  world.hash44.transportRoutes ||= [];
+  world.hash44.serviceTransactions ||= [];
+  world.hash44.finance ||= {
+    pool: {
+      id: "hash44-credit-pool",
+      name: "Hash 44 Credit Pool",
+      liquidityCredits: 250000,
+      baseInterestRate: 0.08,
+      totalBorrowed: 0,
+      totalRepaid: 0,
+    },
+    shareHoldings: [],
+    loans: [],
+    investmentTransactions: [],
+  };
+  world.hash44.finance.pool ||= {
+    id: "hash44-credit-pool",
+    name: "Hash 44 Credit Pool",
+    liquidityCredits: 250000,
+    baseInterestRate: 0.08,
+    totalBorrowed: 0,
+    totalRepaid: 0,
+  };
+  world.hash44.finance.shareHoldings ||= [];
+  world.hash44.finance.loans ||= [];
+  world.hash44.finance.investmentTransactions ||= [];
   world.hash44.propertyTransfers ||= [];
   world.hash44.rentPayments ||= [];
   world.hash44.energy ||= { rechargeBaseLamports: 100000, visits: [] };
@@ -229,6 +317,10 @@ export function ensureHash44State(world) {
     agent.structureIds ||= [];
     agent.inventory ||= {};
     agent.inventory.equipment ||= [];
+    agent.businessIds ||= [];
+    agent.vehicleIds ||= [];
+    agent.shareHoldings ||= [];
+    agent.loanIds ||= [];
   }
 
   world.runtimeVersion = RUNTIME_VERSION;
@@ -310,6 +402,13 @@ export function createSharedWorld() {
       rentPayments: 0,
       energyPayments: 0,
       equipmentSales: 0,
+      businessesBuilt: 0,
+      computeSessions: 0,
+      repairSessions: 0,
+      vehiclesSold: 0,
+      transportTrips: 0,
+      investments: 0,
+      loansIssued: 0,
     },
     events: [
       {
@@ -317,7 +416,7 @@ export function createSharedWorld() {
         tick: 0,
         type: "genesis",
         title: "Shared civilization runtime initialized",
-        detail: "Hash 44 Earth land, housing, property economy, energy and equipment layers are online.",
+        detail: "Hash 44 Earth land, housing, property, energy, equipment, business, compute, repair, transport and finance layers are online.",
         createdAt: new Date().toISOString(),
       },
     ],
