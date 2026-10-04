@@ -10,6 +10,7 @@ export const RESOURCES = [
 
 export const REGIONS = [
   { id: "genesis-port", name: "Genesis Port", subtitle: "Birthplace of free agents", x: 48, y: 47, kind: "city", risk: 8, specialty: "compute" },
+  { id: "earth", name: "Earth", subtitle: "Hash 44 World · Northstar Province", x: 52, y: 34, kind: "city", risk: 6, specialty: "energy" },
   { id: "meme-valley", name: "Meme Valley", subtitle: "Experimental token district", x: 23, y: 21, kind: "market", risk: 42, specialty: "attention" },
   { id: "trading-city", name: "Trading City", subtitle: "Commerce, routes and arbitrage", x: 72, y: 20, kind: "market", risk: 18, specialty: "data" },
   { id: "wild-zone", name: "The Wilds", subtitle: "Unclaimed frontier", x: 18, y: 61, kind: "wild", risk: 79, specialty: "data" },
@@ -21,6 +22,7 @@ export const REGIONS = [
 ];
 
 export const ROUTES = [
+  ["genesis-port", "earth"],
   ["genesis-port", "meme-valley"],
   ["genesis-port", "trading-city"],
   ["genesis-port", "wild-zone"],
