@@ -103,3 +103,81 @@ export async function commandSharedAgent(agentId: string, command: any) {
     }),
   });
 }
+
+
+export async function getHash44Config() {
+  return runtimeFetch({
+    method: "GET",
+    query: { op: "hash44_config" },
+  });
+}
+
+export async function hash44BuyLand(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_buy_land", ...payload }),
+  });
+}
+
+export async function hash44Build(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_build", ...payload }),
+  });
+}
+
+export async function hash44ListProperty(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_list_property", ...payload }),
+  });
+}
+
+export async function hash44CancelListing(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_cancel_listing", ...payload }),
+  });
+}
+
+export async function hash44BuyListing(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_buy_listing", ...payload }),
+  });
+}
+
+export async function hash44TransferProperty(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_transfer_property", ...payload }),
+  });
+}
+
+export async function hash44SetRent(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_set_rent", ...payload }),
+  });
+}
+
+export async function hash44Rent(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_rent", ...payload }),
+  });
+}
+
+export async function hash44Charge(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_charge", ...payload }),
+  });
+}
+
+export async function hash44BuyEquipment(payload: any) {
+  return runtimeFetch({
+    method: "POST",
+    body: JSON.stringify({ op: "hash44_buy_equipment", ...payload }),
+  });
+}
