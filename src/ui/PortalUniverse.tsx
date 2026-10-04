@@ -15,6 +15,7 @@ import {
 import { getRegion, shortWallet } from "../world";
 import UniverseLayerPanel from "./UniverseLayerPanel";
 import AgentDossier from "./AgentDossier";
+import Hash44World from "./Hash44World";
 
 type PortalUniverseProps = {
   world: any;
@@ -26,6 +27,7 @@ type PortalUniverseProps = {
   onConnect: () => void;
   onDeploy: () => void;
   onRelease: (agentId: string) => void;
+  onWorldUpdate: (world: any) => void;
   onExit: () => void;
 };
 
@@ -38,6 +40,7 @@ const SCENES = [
 const tabs = [
   "Agents",
   "Worlds",
+  "Hash 44",
   "Teams",
   "Meme Valley",
   "Governance",
@@ -61,6 +64,7 @@ export default function PortalUniverse({
   onConnect,
   onDeploy,
   onRelease,
+  onWorldUpdate,
   onExit,
 }: PortalUniverseProps) {
   const [activeTab, setActiveTab] =
@@ -392,12 +396,22 @@ export default function PortalUniverse({
             </div>
           </motion.button>
         </section>
+      ) : activeTab === "Hash 44" ? (
+        <Hash44World
+          world={world}
+          selectedAgent={selectedAgent}
+          runtimeMode={runtimeMode}
+          wallet={world.wallet || null}
+          onConnect={onConnect}
+          onWorldUpdate={onWorldUpdate}
+        />
       ) : (
         <UniverseLayerPanel
           activeTab={activeTab}
           world={world}
           selectedAgent={selectedAgent}
           onSelectRegion={onSelectRegion}
+          onEnterHash44={() => setActiveTab("Hash 44")}
         />
       )}
 
