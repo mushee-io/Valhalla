@@ -16,6 +16,7 @@ type Props = {
   world: any;
   selectedAgent: any;
   onSelectRegion: (regionId: string) => void;
+  onEnterHash44?: () => void;
 };
 
 function number(value: any) {
@@ -49,6 +50,7 @@ export default function UniverseLayerPanel({
   world,
   selectedAgent,
   onSelectRegion,
+  onEnterHash44,
 }: Props) {
   if (activeTab === "Agents") return null;
 
@@ -130,7 +132,10 @@ export default function UniverseLayerPanel({
                 return (
                   <button
                     key={id}
-                    onClick={() => onSelectRegion(id)}
+                    onClick={() => {
+                      onSelectRegion(id);
+                      if (id === "earth") onEnterHash44?.();
+                    }}
                     className="group min-h-[190px] min-w-0 rounded-[26px] border border-white/12 bg-white/[0.025] p-5 text-left transition duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-white/[0.055]"
                   >
                     <div className="flex items-start justify-between">
@@ -150,6 +155,11 @@ export default function UniverseLayerPanel({
                       {localAgents} agents ·{" "}
                       {(zone.resource || zone.specialty || "unknown").toUpperCase()}
                     </p>
+                    {id === "earth" && (
+                      <div className="mt-4 inline-flex items-center rounded-full border border-white/12 bg-white/[0.04] px-3 py-1.5 text-[8px] uppercase tracking-[0.1em] text-white/70">
+                        Enter Hash 44 World
+                      </div>
+                    )}
 
                     <div className="mt-5 flex flex-wrap gap-2 text-[8px] uppercase tracking-[0.09em] text-white/45">
                       {city && (
