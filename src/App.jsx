@@ -316,6 +316,9 @@ export default function App() {
         onConnect={connectWallet}
         onDeploy={() => setDeployOpen(true)}
         onRelease={releaseSelectedAgent}
+        onWorldUpdate={(remote) =>
+          setWorld((current) => mergeRemoteWorld(current, remote))
+        }
         onExit={() => setEntered(false)}
       />
 
